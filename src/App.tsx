@@ -13,6 +13,8 @@ import Emails from "./pages/Emails";
 import Bots from "./pages/Bots";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +27,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/exceptions" element={<Exceptions />} />
             <Route path="/reports" element={<Reports />} />
