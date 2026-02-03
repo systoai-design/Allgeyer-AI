@@ -55,39 +55,44 @@ export function KpiCard({
     : '';
 
   return (
-    <Card className={cn('relative overflow-hidden', className)}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+    <Card className={cn(
+      'relative overflow-hidden border-border/50 transition-all hover:border-border hover:shadow-sm',
+      className
+    )}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground line-clamp-1">
           {title}
         </CardTitle>
         {Icon && (
-          <div className="rounded-lg bg-muted p-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
             <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold">{value}</span>
+          <span className="text-2xl font-bold tracking-tight">{value}</span>
           {status && (
-            <Badge variant="outline" className={cn('text-xs', statusStyles[status])}>
+            <Badge variant="outline" className={cn('text-xs font-medium', statusStyles[status])}>
               {statusLabels[status]}
             </Badge>
           )}
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          {trend && TrendIcon && (
-            <div className={cn('flex items-center gap-1 text-sm', trendColor)}>
-              <TrendIcon className="h-4 w-4" />
-              <span>{Math.abs(trend.value)}%</span>
-            </div>
-          )}
-          {(subtitle || trend?.label) && (
-            <span className="text-sm text-muted-foreground">
-              {subtitle || trend?.label}
-            </span>
-          )}
-        </div>
+        {(trend || subtitle) && (
+          <div className="mt-2 flex items-center gap-2">
+            {trend && TrendIcon && (
+              <div className={cn('flex items-center gap-1 text-sm font-medium', trendColor)}>
+                <TrendIcon className="h-3.5 w-3.5" />
+                <span>{Math.abs(trend.value)}%</span>
+              </div>
+            )}
+            {(subtitle || trend?.label) && (
+              <span className="text-xs text-muted-foreground">
+                {subtitle || trend?.label}
+              </span>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
