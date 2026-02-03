@@ -12,7 +12,9 @@ interface CompanySelectorContextType {
 const CompanySelectorContext = createContext<CompanySelectorContextType | undefined>(undefined);
 
 export function CompanySelectorProvider({ children }: { children: ReactNode }) {
-  const { companies, loading: authLoading } = useAuth();
+  const auth = useAuth();
+  const companies = auth?.companies ?? [];
+  const authLoading = auth?.loading ?? true;
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   // Auto-select first company when companies load
