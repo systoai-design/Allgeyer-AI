@@ -1,147 +1,96 @@
 
+# Fix Intuit OAuth Logo + Enable Multi-Company QBO Connections
 
-# Multi-Bot Automation Platform
+## Overview
 
-A comprehensive automation and reporting system for three companies (Property Halo, Unique Painting, ATI Security) with intelligent bots that pull data from multiple sources, generate professional reports, and trigger exception alerts.
-
----
-
-## Core Platform Architecture
-
-### 1. Dashboard & Reporting Hub
-A central web application where team members can:
-- **View real-time KPIs** across all companies (with role-based visibility)
-- **Browse historical reports** (Daily, Weekly, Monthly, Quarterly)
-- **Track exceptions** that need attention with status management
-- **See trend charts** comparing current vs. historical performance
-- **Access the email archive** of all sent reports
-
-### 2. Bot Configuration System
-An admin interface to:
-- **Configure bot schedules** (when daily/weekly/monthly/quarterly runs execute)
-- **Manage email recipients** per company and report type
-- **Set exception thresholds** (e.g., "flag if uncategorized transactions > 5")
-- **Define KPI targets** for visual indicators (green/yellow/red)
-- **Test integrations** and preview email outputs
-
-### 3. Integration Framework
-Placeholder architecture for external systems:
-- **QuickBooks Online** - Financial data for all 3 companies
-- **PETE CRM** - Property Halo lead and deal tracking
-- **Labortech** - Lead tracking for Unique Painting and ATI Security
-- **Jobber** - Estimates, jobs, and collections for painting/security
+Two issues to address:
+1. **Broken Logo on Intuit Authorization Screen** - The "Systo Bot Platform" logo appears broken on Intuit's OAuth consent screen because Intuit fetches the logo from the app registration in your Intuit Developer account, not from your application code
+2. **Multi-Company QBO Connections** - Good news! The current architecture already supports connecting multiple QBO accounts (one per company)
 
 ---
 
-## The Four Bots
+## Issue 1: Broken Intuit Logo
 
-### Bot 2 — Financial Control Bot (Foundation)
-*All other bots depend on this one*
+### Root Cause
+The logo you see on Intuit's OAuth authorization screen is configured in **Intuit Developer Portal**, not in this application's code. Intuit hosts that page and displays your app's registered logo.
 
-**Daily Operations:**
-- Pull and classify bank/card transactions
-- Flag uncategorized, duplicate, or incomplete transactions
-- Maintain rolling transaction logs
+### Solution
+You need to update the logo in your Intuit Developer account:
 
-**Weekly Operations:**
-- Generate reconciliation statements
-- Report cash positions per company
-- Track unresolved items
+1. Go to [Intuit Developer Portal](https://developer.intuit.com/app/developer/dashboard)
+2. Select your app (Systo Bot Platform)
+3. Navigate to **App Settings** > **App Info**
+4. Upload a proper logo image (requirements: PNG/JPG, typically 200x200px minimum)
+5. Save changes
 
-**Monthly Operations:**
-- Finalized P&L and KPIs per company
-- Asset summaries (bought/sold/under contract)
-- Recurring expense and debt tracking
-
-**Quarterly Operations:**
-- KPI rollups and net worth statements
-- Investment summaries and credit snapshots
+This is **not** something that can be fixed in the application code since Intuit controls that OAuth consent screen.
 
 ---
 
-### Bot 1 — Property Halo (Real Estate)
+## Issue 2: Multi-Company QBO Connections
 
-**Daily:** Leads, appointments, calls, offers made/accepted  
-**Weekly:** Contract status, pipeline, cash position  
-**Monthly:** Closings, revenue, profit, asset movement  
-**Quarterly:** ROI analysis, capital deployment, portfolio valuation
+### Current Architecture (Already Supports This!)
 
----
+The database schema already allows each company to have its own QBO connection:
 
-### Bot 3 — Unique Painting
+```text
+integrations table:
++--------------------+------------------+---------------+
+| company_id         | integration_type | is_connected  |
++--------------------+------------------+---------------+
+| Property Halo      | quickbooks       | true          |
+| Unique Painting    | quickbooks       | (not yet)     |
+| ATI Security       | quickbooks       | (not yet)     |
++--------------------+------------------+---------------+
+```
 
-**Daily:** Leads, estimates sent, jobs completed  
-**Weekly:** Jobs sold, revenue booked, cash available  
-**Monthly:** Profit per job, crew utilization  
-**Quarterly:** Revenue growth, margin trends, customer acquisition
+**How it works:**
+- Each company has its own row in `integrations` table
+- The unique constraint is on `(company_id, integration_type)`
+- When you select a different company in the sidebar, the Settings page shows that company's connection status
 
----
+### Minor UX Improvement
 
-### Bot 4 — ATI Security
-
-**Daily:** Leads, estimates, active projects, installations  
-**Weekly:** Contracts signed, pipeline value  
-**Monthly:** Revenue, gross margin, recurring vs. project revenue  
-**Quarterly:** Contract backlog, deal size trends, client concentration
-
----
-
-## Email System
-
-### Professional HTML Reports
-- Company-branded headers with logos
-- Color-coded KPI indicators (on-track/warning/critical)
-- Clean data tables with proper formatting
-- Clear separation of finalized vs. provisional data
-- Exception call-outs with required actions
-
-### Smart Routing
-- Todd@upsellhomes.com → Unique Painting + ATI reports
-- Ben@benallgeyer.com → Property Halo reports
-- Configurable CC/BCC per report type
+I'll add a visual indicator on the Settings page showing which companies have QBO connected vs not connected, so you can easily see the status across all your companies at a glance.
 
 ---
 
-## User Management & Security
+## Implementation Plan
 
-### Role-Based Access
-- **Super Admin** — Full access to all companies and configuration
-- **Company Admin** — Full access to their company only
-- **Team Member** — View reports and exceptions for their company
+### Step 1: Add Multi-Company Integration Status Component
+Create a new section on Settings page showing connection status for all companies (for super admins)
 
-### Company Isolation
-- Users only see data for companies they're assigned to
-- Each company's data is completely separated
-- Audit trail of all bot actions and report deliveries
+### Step 2: Improve Settings Page Layout
+- Add a table/grid showing all companies and their QBO connection status
+- Allow quick switching between companies to connect/manage each one
+- Show realm ID and last sync time for connected companies
 
----
-
-## Data & Storage
-
-### Historical Database
-- All transaction classifications stored with timestamps
-- Complete KPI history for trend analysis
-- Email delivery logs and content archives
-- Exception tracking with resolution history
-
-### Analytics-Ready
-- Compare any period to previous periods
-- Track KPI trends over time
-- Exportable data for external analysis
+### Step 3: Add Company Switcher in QBO Card
+Make it clearer which company you're connecting when initiating OAuth
 
 ---
 
-## Initial Build Scope
+## Technical Details
 
-**Phase 1** will deliver:
-1. Complete database schema with all tables
-2. User authentication with role-based permissions
-3. Dashboard with company selector and KPI displays
-4. Bot configuration interface
-5. Exception management system
-6. Email template system with Resend integration
-7. Scheduled job infrastructure (daily/weekly/monthly/quarterly)
-8. Mock data generators for each integration point
+### New Component: CompanyIntegrationStatus
+```text
+File: src/components/settings/CompanyIntegrationStatus.tsx
 
-The integration connectors (QuickBooks, PETE, Labortech, Jobber) will be structured with placeholder functions, ready for API credentials when available.
+Displays a grid of all companies with:
+- Company name and color badge
+- QBO connection status (connected/not connected)
+- Last sync time (if connected)  
+- Quick action button to connect or manage
+```
 
+### Modified Files
+- `src/pages/Settings.tsx` - Add the new component and improve layout
+
+---
+
+## Summary
+
+| Item | Action Required |
+|------|----------------|
+| Broken logo on Intuit screen | Update logo in Intuit Developer Portal (manual step) |
+| Multi-company QBO support | Already works! I'll add a status overview for visibility |
