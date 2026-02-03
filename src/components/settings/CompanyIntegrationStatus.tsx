@@ -188,28 +188,42 @@ export function CompanyIntegrationStatus({
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {isConnected ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleManageClick(company)}
-                      >
-                        <ExternalLink className="mr-1.5 h-3 w-3" />
-                        Manage
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="bg-[#2CA01C] hover:bg-[#248017] text-white"
-                        onClick={() => handleConnectClick(company)}
-                        disabled={connecting}
-                      >
-                        {connecting && isSelected ? (
-                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                        ) : null}
-                        Connect
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {!isSelected && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCompany(company);
+                            onSelectCompany(company);
+                          }}
+                        >
+                          Select
+                        </Button>
+                      )}
+                      {isConnected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleManageClick(company)}
+                        >
+                          <ExternalLink className="mr-1.5 h-3 w-3" />
+                          Manage
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-[#2CA01C] hover:bg-[#248017] text-white"
+                          onClick={() => handleConnectClick(company)}
+                          disabled={connecting}
+                        >
+                          {connecting && isSelected ? (
+                            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                          ) : null}
+                          Connect
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
