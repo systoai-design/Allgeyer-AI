@@ -1,1 +1,4 @@
 project_id = "dbnqnxgrjoqgifchqtua"
+
+[functions.qbo-webhook]
+verify_jwt = false
