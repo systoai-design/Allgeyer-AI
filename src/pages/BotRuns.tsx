@@ -103,9 +103,13 @@ function BotRunsContent() {
   const handleTriggerRun = async (botId: string, cadence: CadenceType) => {
     if (!selectedCompany) return;
     
+    const bot = bots.find(b => b.id === botId);
+    if (!bot) return;
+    
     setTriggeringBot(botId);
     try {
-      const { data, error } = await supabase.from('bot_runs').insert({
+      // Create the bot run record
+      const { data: botRun, error } = await supabase.from('bot_runs').insert({
         bot_id: botId,
         company_id: selectedCompany.id,
         cadence,
@@ -114,8 +118,42 @@ function BotRunsContent() {
 
       if (error) throw error;
 
-      setRuns(prev => [data as BotRun, ...prev]);
-      toast.success(`Bot run queued successfully`);
+      setRuns(prev => [botRun as BotRun, ...prev]);
+      toast.success(`Bot run queued - executing...`);
+
+      // Determine which edge function to call based on bot type
+      const isFinancialControl = bot.bot_type === 'financial_control';
+      const functionName = isFinancialControl ? 'run-financial-control-bot' : 'run-crm-bot';
+
+      // Call the appropriate edge function
+      const { data: result, error: funcError } = await supabase.functions.invoke(functionName, {
+        body: {
+          bot_run_id: botRun.id,
+          company_id: selectedCompany.id,
+          bot_type: bot.bot_type,
+          cadence,
+        },
+      });
+
+      if (funcError) {
+        console.error('Edge function error:', funcError);
+        toast.error(`Bot run failed: ${funcError.message}`);
+      } else if (result?.error) {
+        console.error('Bot run error:', result.error);
+        toast.error(`Bot run failed: ${result.error}`);
+      } else {
+        toast.success('Bot run completed successfully!');
+      }
+
+      // Refresh the runs list to get updated status
+      const { data: updatedRuns } = await supabase
+        .from('bot_runs')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (updatedRuns) setRuns(updatedRuns as BotRun[]);
+
     } catch (error) {
       console.error('Error triggering bot run:', error);
       toast.error('Failed to trigger bot run');
