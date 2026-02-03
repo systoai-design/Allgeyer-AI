@@ -6,10 +6,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, Loader2, Link2, CheckCircle2, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { Loader2, Link2, CheckCircle2, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Integration } from '@/types/database';
+import { CompanyIntegrationStatus } from '@/components/settings/CompanyIntegrationStatus';
 
 function SettingsContent() {
   const navigate = useNavigate();
@@ -147,9 +148,23 @@ function SettingsContent() {
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Platform configuration and integrations</p>
       </div>
+      {/* Multi-Company Integration Overview (for super admins or users with multiple companies) */}
+      {availableCompanies.length > 1 && (
+        <CompanyIntegrationStatus
+          onSelectCompany={(company) => {
+            // Scroll to QBO card when a company is selected
+            const qboCard = document.getElementById('qbo-integration-card');
+            if (qboCard) {
+              qboCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }}
+          onConnectQBO={handleConnectQBO}
+          connecting={connecting}
+        />
+      )}
 
       {/* QuickBooks Integration Card */}
-      <Card>
+      <Card id="qbo-integration-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
