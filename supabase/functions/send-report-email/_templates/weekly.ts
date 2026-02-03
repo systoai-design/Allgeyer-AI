@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatDate
 } from './base.ts';
+import { generateHtmlBarChart, generateTrendSparkline, generateStatusIndicator } from './emailCharts.ts';
 
 export function generateWeeklyReport(data: ReportData): string {
   const colors = companyColors[data.company.companyType] || companyColors.property_halo;
@@ -113,6 +114,34 @@ export function generateWeeklyReport(data: ReportData): string {
     <tr>
       <td style="padding: 24px 40px 0;">
         ${exceptionSummary}
+      </td>
+    </tr>
+
+    <!-- Visual Charts -->
+    <tr>
+      <td style="padding: 24px 40px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;">📊 Visual Overview</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="width: 50%; vertical-align: top; padding-right: 12px;">
+              ${generateHtmlBarChart(
+                data.kpis.slice(0, 4).map(k => ({
+                  label: k.label.length > 15 ? k.label.substring(0, 15) + '...' : k.label,
+                  value: typeof k.value === 'number' ? k.value : parseInt(String(k.value).replace(/[^0-9]/g, '')) || 0,
+                  color: getStatusColor(k.status)
+                })),
+                { title: 'Top Metrics', primaryColor: companyColor }
+              )}
+            </td>
+            <td style="width: 50%; vertical-align: top; padding-left: 12px;">
+              ${generateStatusIndicator(
+                data.kpis.filter(k => k.status === 'on_track').length,
+                data.kpis.filter(k => k.status === 'warning').length,
+                data.kpis.filter(k => k.status === 'critical').length
+              )}
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
 

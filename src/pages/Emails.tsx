@@ -31,9 +31,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Mail, Search, Eye, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
+import { Mail, Search, Eye, CheckCircle, Clock, XCircle, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { exportEmailLogs } from '@/lib/csvExport';
+import { toast } from 'sonner';
 import type { EmailLog, Bot as BotType, CadenceType } from '@/types/database';
 
 const cadenceStyles: Record<CadenceType, string> = {
@@ -135,6 +137,21 @@ function EmailsContent() {
               <CardDescription>{filteredEmails.length} emails</CardDescription>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (filteredEmails.length === 0) {
+                    toast.error('No emails to export');
+                    return;
+                  }
+                  exportEmailLogs(filteredEmails, selectedCompany?.name || 'company');
+                  toast.success('Email logs exported successfully');
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanySelector, getCompanyColor } from '@/hooks/useCompanySelector';
@@ -7,17 +7,23 @@ import { KpiCard } from '@/components/dashboard/KpiCard';
 import { ExceptionsList } from '@/components/dashboard/ExceptionsList';
 import { BotStatusCard } from '@/components/dashboard/BotStatusCard';
 import { RecentReportsCard } from '@/components/dashboard/RecentReportsCard';
+import { KpiTrendChart } from '@/components/dashboard/KpiTrendChart';
+import { ExceptionBarChart } from '@/components/dashboard/ExceptionBarChart';
+import { PerformanceDonutChart } from '@/components/dashboard/PerformanceDonutChart';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, TrendingUp, Download } from 'lucide-react';
+import { exportKPIData } from '@/lib/csvExport';
+import { toast } from 'sonner';
 import {
   getCompanyKpis,
   getMockKpiValues,
   formatKpiValue,
   financialControlKpis,
 } from '@/config/kpiDefinitions';
-import type { Bot, Exception, EmailLog, BotRun, CadenceType } from '@/types/database';
+import type { Bot, Exception, EmailLog, BotRun, CadenceType, KpiHistory } from '@/types/database';
 
 function DashboardContent() {
   const navigate = useNavigate();
@@ -27,8 +33,10 @@ function DashboardContent() {
   const [selectedCadence, setSelectedCadence] = useState<CadenceType>('daily');
   const [bots, setBots] = useState<Bot[]>([]);
   const [exceptions, setExceptions] = useState<Exception[]>([]);
+  const [allExceptions, setAllExceptions] = useState<Exception[]>([]);
   const [recentEmails, setRecentEmails] = useState<EmailLog[]>([]);
   const [botRuns, setBotRuns] = useState<BotRun[]>([]);
+  const [kpiHistory, setKpiHistory] = useState<KpiHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Redirect if not logged in
@@ -51,7 +59,7 @@ function DashboardContent() {
           .select('*');
         if (botsData) setBots(botsData as Bot[]);
 
-        // Fetch exceptions for selected company
+        // Fetch exceptions for selected company (open/in_progress only for list)
         const { data: exceptionsData } = await supabase
           .from('exceptions')
           .select('*')
@@ -60,6 +68,13 @@ function DashboardContent() {
           .order('created_at', { ascending: false })
           .limit(5);
         if (exceptionsData) setExceptions(exceptionsData as Exception[]);
+
+        // Fetch ALL exceptions for charts
+        const { data: allExceptionsData } = await supabase
+          .from('exceptions')
+          .select('*')
+          .eq('company_id', selectedCompany.id);
+        if (allExceptionsData) setAllExceptions(allExceptionsData as Exception[]);
 
         // Fetch recent emails
         const { data: emailsData } = await supabase
@@ -78,6 +93,15 @@ function DashboardContent() {
           .order('created_at', { ascending: false })
           .limit(10);
         if (runsData) setBotRuns(runsData as BotRun[]);
+
+        // Fetch KPI history for charts
+        const { data: kpiData } = await supabase
+          .from('kpi_history')
+          .select('*')
+          .eq('company_id', selectedCompany.id)
+          .order('period_end', { ascending: false })
+          .limit(100);
+        if (kpiData) setKpiHistory(kpiData as KpiHistory[]);
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -133,6 +157,85 @@ function DashboardContent() {
 
   const currentKpis = companyKpis[selectedCadence] || [];
 
+  // Generate mock trend data for charts
+  const trendChartData = useMemo(() => {
+    const periods = selectedCadence === 'daily' 
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      : selectedCadence === 'weekly'
+      ? ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+      : selectedCadence === 'monthly'
+      ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+      : ['Q1', 'Q2', 'Q3', 'Q4'];
+    
+    // Use real KPI history if available, otherwise generate mock data
+    if (kpiHistory.length > 0) {
+      const grouped: Record<string, Record<string, number>> = {};
+      kpiHistory.forEach(kpi => {
+        const period = new Date(kpi.period_end).toLocaleDateString('en-US', { month: 'short' });
+        if (!grouped[period]) grouped[period] = {};
+        grouped[period][kpi.kpi_name] = kpi.kpi_value || 0;
+      });
+      return Object.entries(grouped).slice(0, 6).map(([period, values]) => ({
+        period,
+        ...values
+      }));
+    }
+    
+    // Mock data
+    return periods.map((period, i) => ({
+      period,
+      Leads: 20 + Math.floor(Math.random() * 30) + i * 5,
+      Conversions: 5 + Math.floor(Math.random() * 15) + i * 2,
+      Revenue: 15000 + Math.floor(Math.random() * 10000) + i * 3000,
+    }));
+  }, [selectedCadence, kpiHistory]);
+
+  // Exception chart data
+  const exceptionChartData = useMemo(() => {
+    const counts = {
+      critical: allExceptions.filter(e => e.severity === 'critical').length,
+      high: allExceptions.filter(e => e.severity === 'high').length,
+      medium: allExceptions.filter(e => e.severity === 'medium').length,
+      low: allExceptions.filter(e => e.severity === 'low').length,
+    };
+    return [
+      { name: 'Critical', value: counts.critical, color: 'hsl(var(--destructive))' },
+      { name: 'High', value: counts.high, color: '#f97316' },
+      { name: 'Medium', value: counts.medium, color: 'hsl(var(--warning))' },
+      { name: 'Low', value: counts.low, color: 'hsl(var(--muted-foreground))' },
+    ];
+  }, [allExceptions]);
+
+  // KPI status distribution
+  const kpiStatusData = useMemo(() => {
+    const values = getMockKpiValues(companyType, selectedCadence);
+    const statuses = Object.values(values);
+    return [
+      { name: 'On Track', value: statuses.filter(s => s.status === 'on_track').length, color: 'hsl(var(--success))' },
+      { name: 'Warning', value: statuses.filter(s => s.status === 'warning').length, color: 'hsl(var(--warning))' },
+      { name: 'Critical', value: statuses.filter(s => s.status === 'critical').length, color: 'hsl(var(--destructive))' },
+    ];
+  }, [companyType, selectedCadence]);
+
+  const handleExportKPIs = () => {
+    if (kpiHistory.length === 0) {
+      toast.info('No KPI history to export yet - using mock data');
+      // Export mock data as example
+      const mockExport = currentKpis.map(kpi => ({
+        kpi_name: kpi.label,
+        kpi_value: Math.floor(Math.random() * 100),
+        kpi_status: 'on_track',
+        cadence: selectedCadence,
+        period_start: new Date().toISOString(),
+        period_end: new Date().toISOString(),
+      }));
+      exportKPIData(mockExport, selectedCompany?.name || 'company');
+    } else {
+      exportKPIData(kpiHistory, selectedCompany?.name || 'company');
+    }
+    toast.success('KPI data exported successfully');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -167,10 +270,16 @@ function DashboardContent() {
           <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
             {/* Company-Specific KPIs */}
             <div>
-              <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" style={{ color: getCompanyColor(companyType) }} />
-                {selectedCompany?.name} KPIs
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" style={{ color: getCompanyColor(companyType) }} />
+                  {selectedCompany?.name} KPIs
+                </h2>
+                <Button variant="outline" size="sm" onClick={handleExportKPIs}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export KPIs
+                </Button>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {companyKpis[tab.value]?.map((kpi) => {
                   const values = getMockKpiValues(companyType, tab.value);
@@ -187,6 +296,28 @@ function DashboardContent() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <KpiTrendChart
+                title="Performance Trends"
+                data={trendChartData}
+                lines={[
+                  { key: 'Leads', name: 'Leads', color: getCompanyColor(companyType) },
+                  { key: 'Conversions', name: 'Conversions', color: 'hsl(var(--chart-2))' },
+                ]}
+              />
+              <ExceptionBarChart
+                title="Exceptions by Severity"
+                data={exceptionChartData}
+              />
+              <PerformanceDonutChart
+                title="KPI Status"
+                data={kpiStatusData}
+                centerLabel="KPIs"
+                centerValue={currentKpis.length}
+              />
             </div>
 
             {/* Financial Control KPIs (Foundation) */}

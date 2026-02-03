@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatDate
 } from './base.ts';
+import { generateHtmlBarChart, generateStatusIndicator, generateMiniDonutChart } from './emailCharts.ts';
 
 export function generateMonthlyReport(data: ReportData): string {
   const colors = companyColors[data.company.companyType] || companyColors.property_halo;
@@ -147,6 +148,42 @@ export function generateMonthlyReport(data: ReportData): string {
         <div style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px;">Performance Overview</div>
         ${statusSummary}
         ${exceptionBreakdown}
+      </td>
+    </tr>
+
+    <!-- Visual Charts -->
+    <tr>
+      <td style="padding: 0 40px 24px;">
+        <div style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">📊 Performance Charts</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="width: 60%; vertical-align: top; padding-right: 16px;">
+              ${generateHtmlBarChart(
+                data.kpis.map(k => ({
+                  label: k.label.length > 18 ? k.label.substring(0, 18) + '...' : k.label,
+                  value: typeof k.value === 'number' ? k.value : parseInt(String(k.value).replace(/[^0-9]/g, '')) || 0,
+                  color: getStatusColor(k.status)
+                })),
+                { title: 'KPI Values', primaryColor: companyColor, maxWidth: 180 }
+              )}
+            </td>
+            <td style="width: 40%; vertical-align: top; padding-left: 16px;">
+              <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Status Distribution</div>
+              ${generateStatusIndicator(
+                data.kpis.filter(k => k.status === 'on_track').length,
+                data.kpis.filter(k => k.status === 'warning').length,
+                data.kpis.filter(k => k.status === 'critical').length
+              )}
+              <div style="margin-top: 20px;">
+                ${generateMiniDonutChart(
+                  data.kpis.filter(k => k.status === 'on_track').length,
+                  data.kpis.length,
+                  { label: 'On Track Rate', color: companyColor }
+                )}
+              </div>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
 
