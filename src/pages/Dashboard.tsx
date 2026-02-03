@@ -5,16 +5,16 @@ import { useCompanySelector, getCompanyColor } from '@/hooks/useCompanySelector'
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { KpiCard } from '@/components/dashboard/KpiCard';
 import { ExceptionsList } from '@/components/dashboard/ExceptionsList';
-import { BotStatusCard } from '@/components/dashboard/BotStatusCard';
 import { RecentReportsCard } from '@/components/dashboard/RecentReportsCard';
 import { KpiTrendChart } from '@/components/dashboard/KpiTrendChart';
 import { ExceptionBarChart } from '@/components/dashboard/ExceptionBarChart';
 import { PerformanceDonutChart } from '@/components/dashboard/PerformanceDonutChart';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, TrendingUp, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2 } from 'lucide-react';
 import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
 import {
@@ -126,15 +126,7 @@ function DashboardContent() {
   // Get company type for conditional rendering
   const companyType = selectedCompany?.company_type || 'property_halo';
   const companyKpis = getCompanyKpis(companyType);
-  const kpiValues = getMockKpiValues(companyType, selectedCadence);
-  const financialKpis = financialControlKpis[selectedCadence];
-
-  // Map bots with their latest run status
-  const botsWithStatus = bots.map(bot => ({
-    ...bot,
-    last_run: botRuns.find(run => run.bot_id === bot.id),
-    next_run: undefined
-  }));
+  const companyColor = selectedCompany ? getCompanyColor(selectedCompany.company_type) : 'hsl(var(--accent))';
 
   // Map exceptions with bot names
   const exceptionsWithBots = exceptions.map(ex => ({
@@ -148,11 +140,11 @@ function DashboardContent() {
     bot_name: bots.find(b => b.id === email.bot_id)?.name
   }));
 
-  const cadenceTabs: { value: CadenceType; label: string }[] = [
-    { value: 'daily', label: 'Daily' },
-    { value: 'weekly', label: 'Weekly' },
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'quarterly', label: 'Quarterly' },
+  const cadenceTabs: { value: CadenceType; label: string; description: string }[] = [
+    { value: 'daily', label: 'Daily', description: 'Daily operational metrics' },
+    { value: 'weekly', label: 'Weekly', description: 'Weekly performance trends' },
+    { value: 'monthly', label: 'Monthly', description: 'Monthly financial summary' },
+    { value: 'quarterly', label: 'Quarterly', description: 'Quarterly strategic overview' },
   ];
 
   const currentKpis = companyKpis[selectedCadence] || [];
@@ -236,49 +228,84 @@ function DashboardContent() {
     toast.success('KPI data exported successfully');
   };
 
+  // Quick stats for header
+  const quickStats = {
+    openExceptions: allExceptions.filter(e => e.status === 'open').length,
+    recentRuns: botRuns.filter(r => r.status === 'completed').length,
+    emailsSent: recentEmails.length,
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
             {selectedCompany ? (
               <span className="flex items-center gap-2">
                 <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ backgroundColor: getCompanyColor(selectedCompany.company_type) }}
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: companyColor }}
                 />
-                {selectedCompany.name} Overview
+                {selectedCompany.name} — Performance Overview
               </span>
             ) : 'Select a company to view data'}
           </p>
+        </div>
+        
+        {/* Quick Stats */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <span className="text-sm font-medium">{quickStats.openExceptions}</span>
+            <span className="text-xs text-muted-foreground">Open</span>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+            <Mail className="h-4 w-4 text-accent" />
+            <span className="text-sm font-medium">{quickStats.emailsSent}</span>
+            <span className="text-xs text-muted-foreground">Emails</span>
+          </div>
         </div>
       </div>
 
       {/* Cadence Tabs */}
       <Tabs value={selectedCadence} onValueChange={(v) => setSelectedCadence(v as CadenceType)}>
-        <TabsList className="grid w-full max-w-md grid-cols-4">
-          {cadenceTabs.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="flex items-center justify-between gap-4">
+          <TabsList className="h-auto p-1">
+            {cadenceTabs.map((tab) => (
+              <TabsTrigger 
+                key={tab.value} 
+                value={tab.value}
+                className="px-4 py-2 data-[state=active]:shadow-sm"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Button variant="outline" size="sm" onClick={handleExportKPIs}>
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
 
         {cadenceTabs.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
             {/* Company-Specific KPIs */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" style={{ color: getCompanyColor(companyType) }} />
-                  {selectedCompany?.name} KPIs
-                </h2>
-                <Button variant="outline" size="sm" onClick={handleExportKPIs}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export KPIs
-                </Button>
+            <section>
+              <div className="mb-4 flex items-center gap-3">
+                <div 
+                  className="flex h-9 w-9 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: `${companyColor}20` }}
+                >
+                  <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {selectedCompany?.name} KPIs
+                  </h2>
+                  <p className="text-sm text-muted-foreground">{tab.description}</p>
+                </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {companyKpis[tab.value]?.map((kpi) => {
@@ -296,15 +323,15 @@ function DashboardContent() {
                   );
                 })}
               </div>
-            </div>
+            </section>
 
             {/* Charts Section */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               <KpiTrendChart
                 title="Performance Trends"
                 data={trendChartData}
                 lines={[
-                  { key: 'Leads', name: 'Leads', color: getCompanyColor(companyType) },
+                  { key: 'Leads', name: 'Leads', color: companyColor },
                   { key: 'Conversions', name: 'Conversions', color: 'hsl(var(--chart-2))' },
                 ]}
               />
@@ -318,14 +345,21 @@ function DashboardContent() {
                 centerLabel="KPIs"
                 centerValue={currentKpis.length}
               />
-            </div>
+            </section>
 
             {/* Financial Control KPIs (Foundation) */}
-            <div>
-              <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                Financial Control
-              </h2>
+            <section>
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-chart-4/10">
+                  <BarChart3 className="h-5 w-5 text-chart-4" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Financial Control</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Foundation metrics across all entities
+                  </p>
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {financialControlKpis[tab.value]?.map((kpi) => {
                   // Generate mock financial data
@@ -352,41 +386,27 @@ function DashboardContent() {
                       icon={kpi.icon}
                       status={kpiValue?.status}
                       trend={kpiValue ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
-                      className="border-muted"
+                      className="border-chart-4/20"
                     />
                   );
                 })}
               </div>
-            </div>
+            </section>
           </TabsContent>
         ))}
       </Tabs>
 
-      {/* Main Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <ExceptionsList
-            exceptions={exceptionsWithBots}
-            isLoading={isLoading}
-          />
-          <RecentReportsCard
-            reports={emailsWithBots}
-            isLoading={isLoading}
-          />
-        </div>
-
-        {/* Right Column */}
-        <div>
-          <BotStatusCard
-            bots={botsWithStatus}
-            isLoading={isLoading}
-            onTriggerRun={(botId, cadence) => {
-              console.log('Trigger run:', botId, cadence);
-            }}
-          />
-        </div>
-      </div>
+      {/* Activity Section */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <ExceptionsList
+          exceptions={exceptionsWithBots}
+          isLoading={isLoading}
+        />
+        <RecentReportsCard
+          reports={emailsWithBots}
+          isLoading={isLoading}
+        />
+      </section>
     </div>
   );
 }
