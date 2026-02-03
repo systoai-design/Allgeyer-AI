@@ -55,12 +55,7 @@ function SettingsContent() {
 
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('qbo-oauth', {
-        body: {},
-        headers: {},
-      });
-
-      // Build the URL with query params
+      // Build the URL with query params for authorization
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qbo-oauth?action=authorize&company_id=${selectedCompany.id}`,
         {
