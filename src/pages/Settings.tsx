@@ -90,7 +90,11 @@ function SettingsContent() {
         if (popup?.closed) {
           clearInterval(pollTimer);
           setConnecting(false);
-          // Refresh integrations
+          
+          // Dispatch custom event to refresh the overview table
+          window.dispatchEvent(new CustomEvent('qbo-connection-updated'));
+          
+          // Refresh integrations for current company
           if (selectedCompany) {
             supabase
               .from('integrations')
@@ -100,6 +104,8 @@ function SettingsContent() {
                 if (data) setIntegrations(data as Integration[]);
               });
           }
+          
+          toast.success('Connection updated - refreshing status...');
         }
       }, 500);
 
