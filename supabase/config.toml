@@ -11,3 +11,15 @@ verify_jwt = false
 
 [functions.qbo-api]
 verify_jwt = false
+
+[functions.run-financial-control-bot]
+verify_jwt = false
+
+[functions.run-crm-bot]
+verify_jwt = false
+
+[functions.send-report-email]
+verify_jwt = false
+
+[functions.test-webhook]
+verify_jwt = false
