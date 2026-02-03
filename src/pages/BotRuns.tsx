@@ -212,8 +212,15 @@ function BotRunsContent() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {bots.map((bot) => {
+          {/* Filter bots: show Financial Control (universal) + company-specific bot */}
+          {(() => {
+            const companyBotType = selectedCompany?.company_type; // e.g., 'property_halo'
+            const relevantBots = bots.filter(bot => 
+              bot.bot_type === 'financial_control' || bot.bot_type === companyBotType
+            );
+            return (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {relevantBots.map((bot) => {
               const lastRun = getLastRun(bot.id);
               const StatusIcon = lastRun ? statusIcons[lastRun.status] : Clock;
               const isTriggering = triggeringBot === bot.id;
@@ -278,6 +285,8 @@ function BotRunsContent() {
               );
             })}
           </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -352,7 +361,9 @@ function BotRunsContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Bots</SelectItem>
-                  {bots.map(bot => (
+                  {bots
+                    .filter(bot => bot.bot_type === 'financial_control' || bot.bot_type === selectedCompany?.company_type)
+                    .map(bot => (
                     <SelectItem key={bot.id} value={bot.id}>{bot.name}</SelectItem>
                   ))}
                 </SelectContent>
