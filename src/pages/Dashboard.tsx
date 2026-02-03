@@ -348,7 +348,7 @@ function DashboardContent() {
               />
             </section>
 
-            {/* Financial Control KPIs (Foundation) */}
+            {/* Financial Control KPIs (Foundation) - Live Data from QBO */}
             <section>
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-chart-4/10">
@@ -357,41 +357,40 @@ function DashboardContent() {
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">Financial Control</h2>
                   <p className="text-sm text-muted-foreground">
-                    Foundation metrics across all entities
+                    Live data from QuickBooks Online
                   </p>
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {financialControlKpis[tab.value]?.map((kpi) => {
-                  // Generate mock financial data
-                  const mockFinancial: Record<string, { value: number; trend: number; status: 'on_track' | 'warning' | 'critical' }> = {
-                    uncategorized_transactions: { value: 3, trend: -40, status: 'on_track' },
-                    duplicate_flags: { value: 1, trend: 0, status: 'on_track' },
-                    incomplete_transactions: { value: 7, trend: 16, status: 'warning' },
-                    cash_position: { value: 485000, trend: 5, status: 'on_track' },
-                    unresolved_items: { value: 4, trend: -20, status: 'on_track' },
-                    net_income: { value: 156000, trend: 12, status: 'on_track' },
-                    assets_bought: { value: 2, trend: 100, status: 'on_track' },
-                    assets_sold: { value: 1, trend: 0, status: 'on_track' },
-                    recurring_expenses: { value: 34500, trend: 3, status: 'on_track' },
-                    net_worth: { value: 2450000, trend: 8, status: 'on_track' },
-                    investment_total: { value: 875000, trend: 15, status: 'on_track' },
-                    credit_utilization: { value: 28, trend: -5, status: 'on_track' },
-                  };
-                  const kpiValue = mockFinancial[kpi.key];
+                  // Find live KPI from kpi_history (match by kpi_name and cadence)
+                  const liveKpi = kpiHistory.find(
+                    k => k.kpi_name === kpi.key && k.cadence === tab.value
+                  );
+                  const kpiValue = liveKpi ? {
+                    value: liveKpi.kpi_value ?? 0,
+                    trend: 0, // No trend calculation yet
+                    status: liveKpi.kpi_status || 'on_track'
+                  } : null;
+                  
                   return (
                     <KpiCard
                       key={kpi.key}
                       title={kpi.label}
                       value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
                       icon={kpi.icon}
-                      status={kpiValue?.status}
-                      trend={kpiValue ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
                       className="border-chart-4/20"
                     />
                   );
                 })}
               </div>
+              {kpiHistory.filter(k => k.cadence === tab.value).length === 0 && (
+                <p className="mt-4 text-sm text-muted-foreground text-center py-8 border border-dashed rounded-lg">
+                  No live KPI data yet. Run the Financial Control bot from Bot Runs to generate KPIs.
+                </p>
+              )}
             </section>
           </TabsContent>
         ))}
