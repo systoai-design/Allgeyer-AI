@@ -2,3 +2,9 @@ project_id = "dbnqnxgrjoqgifchqtua"
 
 [functions.qbo-webhook]
 verify_jwt = false
+
+[functions.qbo-oauth]
+verify_jwt = false
+
+[functions.qbo-oauth-callback]
+verify_jwt = false
