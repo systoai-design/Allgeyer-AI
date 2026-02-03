@@ -8,44 +8,23 @@ import { ExceptionsList } from '@/components/dashboard/ExceptionsList';
 import { BotStatusCard } from '@/components/dashboard/BotStatusCard';
 import { RecentReportsCard } from '@/components/dashboard/RecentReportsCard';
 import { supabase } from '@/integrations/supabase/client';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, TrendingUp } from 'lucide-react';
 import {
-  DollarSign,
-  Users,
-  FileCheck,
-  TrendingUp,
-  Activity,
-  Building2,
-  Loader2
-} from 'lucide-react';
-import type { Bot, Exception, EmailLog, BotRun, BotType, CadenceType } from '@/types/database';
-
-// Mock KPI data for demonstration
-const propertyHaloKpis = {
-  leads: { value: 47, trend: 12, status: 'on_track' as const },
-  appointments: { value: 23, trend: -5, status: 'warning' as const },
-  offers: { value: 8, trend: 33, status: 'on_track' as const },
-  closings: { value: 3, trend: 0, status: 'on_track' as const }
-};
-
-const uniquePaintingKpis = {
-  leads: { value: 89, trend: 8, status: 'on_track' as const },
-  estimates: { value: 34, trend: 15, status: 'on_track' as const },
-  jobsSold: { value: 18, trend: -12, status: 'warning' as const },
-  revenue: { value: '$127,450', trend: 5, status: 'on_track' as const }
-};
-
-const atiSecurityKpis = {
-  leads: { value: 31, trend: 22, status: 'on_track' as const },
-  contracts: { value: 12, trend: 8, status: 'on_track' as const },
-  installations: { value: 7, trend: -3, status: 'warning' as const },
-  revenue: { value: '$89,200', trend: 18, status: 'on_track' as const }
-};
+  getCompanyKpis,
+  getMockKpiValues,
+  formatKpiValue,
+  financialControlKpis,
+} from '@/config/kpiDefinitions';
+import type { Bot, Exception, EmailLog, BotRun, CadenceType } from '@/types/database';
 
 function DashboardContent() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { selectedCompany, isLoading: companyLoading } = useCompanySelector();
   
+  const [selectedCadence, setSelectedCadence] = useState<CadenceType>('daily');
   const [bots, setBots] = useState<Bot[]>([]);
   const [exceptions, setExceptions] = useState<Exception[]>([]);
   const [recentEmails, setRecentEmails] = useState<EmailLog[]>([]);
@@ -122,12 +101,15 @@ function DashboardContent() {
 
   // Get company type for conditional rendering
   const companyType = selectedCompany?.company_type || 'property_halo';
+  const companyKpis = getCompanyKpis(companyType);
+  const kpiValues = getMockKpiValues(companyType, selectedCadence);
+  const financialKpis = financialControlKpis[selectedCadence];
 
   // Map bots with their latest run status
   const botsWithStatus = bots.map(bot => ({
     ...bot,
     last_run: botRuns.find(run => run.bot_id === bot.id),
-    next_run: undefined // Would come from schedules
+    next_run: undefined
   }));
 
   // Map exceptions with bot names
@@ -141,6 +123,15 @@ function DashboardContent() {
     ...email,
     bot_name: bots.find(b => b.id === email.bot_id)?.name
   }));
+
+  const cadenceTabs: { value: CadenceType; label: string }[] = [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'quarterly', label: 'Quarterly' },
+  ];
+
+  const currentKpis = companyKpis[selectedCadence] || [];
 
   return (
     <div className="space-y-6">
@@ -162,33 +153,83 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {companyType === 'property_halo' && (
-          <>
-            <KpiCard title="Leads This Week" value={propertyHaloKpis.leads.value} icon={Users} status={propertyHaloKpis.leads.status} trend={{ value: propertyHaloKpis.leads.trend, label: 'vs last week' }} />
-            <KpiCard title="Appointments" value={propertyHaloKpis.appointments.value} icon={Activity} status={propertyHaloKpis.appointments.status} trend={{ value: propertyHaloKpis.appointments.trend, label: 'vs last week' }} />
-            <KpiCard title="Offers Made" value={propertyHaloKpis.offers.value} icon={FileCheck} status={propertyHaloKpis.offers.status} trend={{ value: propertyHaloKpis.offers.trend, label: 'vs last week' }} />
-            <KpiCard title="Closings MTD" value={propertyHaloKpis.closings.value} icon={Building2} status={propertyHaloKpis.closings.status} trend={{ value: propertyHaloKpis.closings.trend, label: 'vs last month' }} />
-          </>
-        )}
-        {companyType === 'unique_painting' && (
-          <>
-            <KpiCard title="Leads This Week" value={uniquePaintingKpis.leads.value} icon={Users} status={uniquePaintingKpis.leads.status} trend={{ value: uniquePaintingKpis.leads.trend, label: 'vs last week' }} />
-            <KpiCard title="Estimates Sent" value={uniquePaintingKpis.estimates.value} icon={FileCheck} status={uniquePaintingKpis.estimates.status} trend={{ value: uniquePaintingKpis.estimates.trend, label: 'vs last week' }} />
-            <KpiCard title="Jobs Sold" value={uniquePaintingKpis.jobsSold.value} icon={Activity} status={uniquePaintingKpis.jobsSold.status} trend={{ value: uniquePaintingKpis.jobsSold.trend, label: 'vs last week' }} />
-            <KpiCard title="Revenue MTD" value={uniquePaintingKpis.revenue.value} icon={DollarSign} status={uniquePaintingKpis.revenue.status} trend={{ value: uniquePaintingKpis.revenue.trend, label: 'vs last month' }} />
-          </>
-        )}
-        {companyType === 'ati_security' && (
-          <>
-            <KpiCard title="Leads This Week" value={atiSecurityKpis.leads.value} icon={Users} status={atiSecurityKpis.leads.status} trend={{ value: atiSecurityKpis.leads.trend, label: 'vs last week' }} />
-            <KpiCard title="Contracts Signed" value={atiSecurityKpis.contracts.value} icon={FileCheck} status={atiSecurityKpis.contracts.status} trend={{ value: atiSecurityKpis.contracts.trend, label: 'vs last week' }} />
-            <KpiCard title="Installations" value={atiSecurityKpis.installations.value} icon={Activity} status={atiSecurityKpis.installations.status} trend={{ value: atiSecurityKpis.installations.trend, label: 'vs last week' }} />
-            <KpiCard title="Revenue MTD" value={atiSecurityKpis.revenue.value} icon={DollarSign} status={atiSecurityKpis.revenue.status} trend={{ value: atiSecurityKpis.revenue.trend, label: 'vs last month' }} />
-          </>
-        )}
-      </div>
+      {/* Cadence Tabs */}
+      <Tabs value={selectedCadence} onValueChange={(v) => setSelectedCadence(v as CadenceType)}>
+        <TabsList className="grid w-full max-w-md grid-cols-4">
+          {cadenceTabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {cadenceTabs.map((tab) => (
+          <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
+            {/* Company-Specific KPIs */}
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" style={{ color: getCompanyColor(companyType) }} />
+                {selectedCompany?.name} KPIs
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {companyKpis[tab.value]?.map((kpi) => {
+                  const values = getMockKpiValues(companyType, tab.value);
+                  const kpiValue = values[kpi.key];
+                  return (
+                    <KpiCard
+                      key={kpi.key}
+                      title={kpi.label}
+                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                      icon={kpi.icon}
+                      status={kpiValue?.status}
+                      trend={kpiValue ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Financial Control KPIs (Foundation) */}
+            <div>
+              <h2 className="mb-4 text-lg font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                Financial Control
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {financialControlKpis[tab.value]?.map((kpi) => {
+                  // Generate mock financial data
+                  const mockFinancial: Record<string, { value: number; trend: number; status: 'on_track' | 'warning' | 'critical' }> = {
+                    uncategorized_transactions: { value: 3, trend: -40, status: 'on_track' },
+                    duplicate_flags: { value: 1, trend: 0, status: 'on_track' },
+                    incomplete_transactions: { value: 7, trend: 16, status: 'warning' },
+                    cash_position: { value: 485000, trend: 5, status: 'on_track' },
+                    unresolved_items: { value: 4, trend: -20, status: 'on_track' },
+                    net_income: { value: 156000, trend: 12, status: 'on_track' },
+                    assets_bought: { value: 2, trend: 100, status: 'on_track' },
+                    assets_sold: { value: 1, trend: 0, status: 'on_track' },
+                    recurring_expenses: { value: 34500, trend: 3, status: 'on_track' },
+                    net_worth: { value: 2450000, trend: 8, status: 'on_track' },
+                    investment_total: { value: 875000, trend: 15, status: 'on_track' },
+                    credit_utilization: { value: 28, trend: -5, status: 'on_track' },
+                  };
+                  const kpiValue = mockFinancial[kpi.key];
+                  return (
+                    <KpiCard
+                      key={kpi.key}
+                      title={kpi.label}
+                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                      icon={kpi.icon}
+                      status={kpiValue?.status}
+                      trend={kpiValue ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                      className="border-muted"
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {/* Main Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
