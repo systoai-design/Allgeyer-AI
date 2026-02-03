@@ -23,9 +23,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertTriangle, Search, Filter, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Search, Filter, CheckCircle, Clock, XCircle, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
+import { exportExceptions } from '@/lib/csvExport';
+import { toast } from 'sonner';
 import type { Exception, ExceptionSeverity, ExceptionStatus, Bot } from '@/types/database';
 
 const severityStyles: Record<ExceptionSeverity, string> = {
@@ -175,6 +177,25 @@ function ExceptionsContent() {
               <CardDescription>{filteredExceptions.length} items</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (filteredExceptions.length === 0) {
+                    toast.error('No exceptions to export');
+                    return;
+                  }
+                  const exportData = filteredExceptions.map(ex => ({
+                    ...ex,
+                    bot_name: getBotName(ex.bot_id)
+                  }));
+                  exportExceptions(exportData, selectedCompany?.name || 'company');
+                  toast.success('Exceptions exported successfully');
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
