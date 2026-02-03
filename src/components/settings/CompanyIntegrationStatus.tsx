@@ -26,6 +26,23 @@ export function CompanyIntegrationStatus({
   const { availableCompanies, selectedCompany, setSelectedCompany } = useCompanySelector();
   const [companiesWithIntegrations, setCompaniesWithIntegrations] = useState<CompanyWithIntegration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Expose refresh function for parent to call after OAuth
+  useEffect(() => {
+    // Listen for storage events (cross-tab communication) or custom events
+    const handleRefresh = () => {
+      setRefreshKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('qbo-connection-updated', handleRefresh);
+    window.addEventListener('focus', handleRefresh); // Refresh when window gains focus
+    
+    return () => {
+      window.removeEventListener('qbo-connection-updated', handleRefresh);
+      window.removeEventListener('focus', handleRefresh);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchAllIntegrations() {
@@ -53,7 +70,7 @@ export function CompanyIntegrationStatus({
     }
 
     fetchAllIntegrations();
-  }, [availableCompanies]);
+  }, [availableCompanies, refreshKey]);
 
   const handleManageClick = (company: Company) => {
     setSelectedCompany(company);
