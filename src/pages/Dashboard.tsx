@@ -113,32 +113,22 @@ function DashboardContent() {
     fetchData();
   }, [selectedCompany]);
 
-  if (authLoading || companyLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  // Get company type for conditional rendering
+  // Get company type for conditional rendering - must be before useMemo hooks
   const companyType = selectedCompany?.company_type || 'property_halo';
   const companyKpis = getCompanyKpis(companyType);
   const companyColor = selectedCompany ? getCompanyColor(selectedCompany.company_type) : 'hsl(var(--accent))';
 
   // Map exceptions with bot names
-  const exceptionsWithBots = exceptions.map(ex => ({
+  const exceptionsWithBots = useMemo(() => exceptions.map(ex => ({
     ...ex,
     bot_name: bots.find(b => b.id === ex.bot_id)?.name
-  }));
+  })), [exceptions, bots]);
 
   // Map emails with bot names
-  const emailsWithBots = recentEmails.map(email => ({
+  const emailsWithBots = useMemo(() => recentEmails.map(email => ({
     ...email,
     bot_name: bots.find(b => b.id === email.bot_id)?.name
-  }));
+  })), [recentEmails, bots]);
 
   const cadenceTabs: { value: CadenceType; label: string; description: string }[] = [
     { value: 'daily', label: 'Daily', description: 'Daily operational metrics' },
@@ -208,6 +198,17 @@ function DashboardContent() {
       { name: 'Critical', value: statuses.filter(s => s.status === 'critical').length, color: 'hsl(var(--destructive))' },
     ];
   }, [companyType, selectedCadence]);
+
+  // Early returns AFTER all hooks
+  if (authLoading || companyLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   const handleExportKPIs = () => {
     if (kpiHistory.length === 0) {
