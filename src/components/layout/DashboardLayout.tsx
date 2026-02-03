@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { AppSidebar } from './AppSidebar';
-import { CompanySelectorProvider } from '@/hooks/useCompanySelector';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -8,17 +7,15 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <CompanySelectorProvider>
-      <div className="flex min-h-screen bg-background">
-        <div className="fixed inset-y-0 left-0 z-50 w-64">
-          <AppSidebar />
-        </div>
-        <main className="ml-64 flex-1 overflow-auto">
-          <div className="container py-6">
-            {children}
-          </div>
-        </main>
+    <div className="flex min-h-screen bg-background">
+      <div className="fixed inset-y-0 left-0 z-50 w-64">
+        <AppSidebar />
       </div>
-    </CompanySelectorProvider>
+      <main className="ml-64 flex-1 overflow-auto">
+        <div className="container py-6">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
