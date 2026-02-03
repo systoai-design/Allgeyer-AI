@@ -19,7 +19,6 @@ import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
 import {
   getCompanyKpis,
-  getMockKpiValues,
   formatKpiValue,
   financialControlKpis,
 } from '@/config/kpiDefinitions';
@@ -188,16 +187,19 @@ function DashboardContent() {
     ];
   }, [allExceptions]);
 
-  // KPI status distribution
+  // KPI status distribution based on live data
   const kpiStatusData = useMemo(() => {
-    const values = getMockKpiValues(companyType, selectedCadence);
-    const statuses = Object.values(values);
+    // Count statuses from live kpi_history for current cadence
+    const relevantKpis = kpiHistory.filter(k => k.cadence === selectedCadence);
+    const onTrack = relevantKpis.filter(k => k.kpi_status === 'on_track').length;
+    const warning = relevantKpis.filter(k => k.kpi_status === 'warning').length;
+    const critical = relevantKpis.filter(k => k.kpi_status === 'critical').length;
     return [
-      { name: 'On Track', value: statuses.filter(s => s.status === 'on_track').length, color: 'hsl(var(--success))' },
-      { name: 'Warning', value: statuses.filter(s => s.status === 'warning').length, color: 'hsl(var(--warning))' },
-      { name: 'Critical', value: statuses.filter(s => s.status === 'critical').length, color: 'hsl(var(--destructive))' },
+      { name: 'On Track', value: onTrack || 0, color: 'hsl(var(--success))' },
+      { name: 'Warning', value: warning || 0, color: 'hsl(var(--warning))' },
+      { name: 'Critical', value: critical || 0, color: 'hsl(var(--destructive))' },
     ];
-  }, [companyType, selectedCadence]);
+  }, [kpiHistory, selectedCadence]);
 
   // Early returns AFTER all hooks
   if (authLoading || companyLoading) {
@@ -310,20 +312,32 @@ function DashboardContent() {
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {companyKpis[tab.value]?.map((kpi) => {
-                  const values = getMockKpiValues(companyType, tab.value);
-                  const kpiValue = values[kpi.key];
+                  // Look up live data from kpi_history (match by kpi.label which matches DB kpi_name)
+                  const liveKpi = kpiHistory.find(
+                    k => k.kpi_name === kpi.label && k.cadence === tab.value
+                  );
+                  const kpiValue = liveKpi ? {
+                    value: liveKpi.kpi_value ?? 0,
+                    trend: 0,
+                    status: liveKpi.kpi_status || 'on_track'
+                  } : null;
                   return (
                     <KpiCard
                       key={kpi.key}
                       title={kpi.label}
                       value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
                       icon={kpi.icon}
-                      status={kpiValue?.status}
-                      trend={kpiValue ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
                     />
                   );
                 })}
               </div>
+              {companyKpis[tab.value]?.length > 0 && !kpiHistory.some(k => k.cadence === tab.value && companyKpis[tab.value]?.some(kpi => kpi.label === k.kpi_name)) && (
+                <p className="mt-4 text-sm text-muted-foreground text-center py-8 border border-dashed rounded-lg">
+                  No live KPI data yet. Run the {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} bot or connect the integration.
+                </p>
+              )}
             </section>
 
             {/* Charts Section */}
@@ -362,10 +376,10 @@ function DashboardContent() {
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                {financialControlKpis[tab.value]?.map((kpi) => {
-                  // Find live KPI from kpi_history (match by kpi_name and cadence)
+              {financialControlKpis[tab.value]?.map((kpi) => {
+                  // Find live KPI from kpi_history (match by kpi.label which matches DB kpi_name)
                   const liveKpi = kpiHistory.find(
-                    k => k.kpi_name === kpi.key && k.cadence === tab.value
+                    k => k.kpi_name === kpi.label && k.cadence === tab.value
                   );
                   const kpiValue = liveKpi ? {
                     value: liveKpi.kpi_value ?? 0,
