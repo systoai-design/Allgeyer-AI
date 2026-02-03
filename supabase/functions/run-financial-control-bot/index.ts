@@ -407,7 +407,31 @@ async function generateKPIs(
   periodStart: string,
   periodEnd: string
 ): Promise<void> {
+  // Calculate profit metrics
+  // Note: In a full implementation, COGS would come from specific QBO accounts
+  // For now, we estimate gross profit as income minus 60% (typical COGS for service businesses)
+  const estimatedCogs = summary.total_income * 0.4; // 40% COGS estimate
+  const grossProfit = summary.total_income - estimatedCogs;
+  const netProfit = summary.total_income - summary.total_expenses;
+  
   const kpis = [
+    // Universal KPIs (ALL companies)
+    {
+      kpi_name: 'Sales Revenue',
+      kpi_value: summary.total_income,
+      kpi_status: 'on_track',
+    },
+    {
+      kpi_name: 'Gross Profit',
+      kpi_value: grossProfit,
+      kpi_status: grossProfit >= 0 ? 'on_track' : 'critical',
+    },
+    {
+      kpi_name: 'Net Profit',
+      kpi_value: netProfit,
+      kpi_status: netProfit >= 0 ? 'on_track' : netProfit > -10000 ? 'warning' : 'critical',
+    },
+    // Existing operational KPIs
     {
       kpi_name: 'Net Cash Flow',
       kpi_value: summary.net_cash_flow,

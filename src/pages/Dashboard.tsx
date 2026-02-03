@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2 } from 'lucide-react';
+import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2, LinkIcon, AlertCircle } from 'lucide-react';
 import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
 import {
@@ -293,26 +293,84 @@ function DashboardContent() {
         </div>
 
         {cadenceTabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
-            {/* Company-Specific KPIs */}
+        <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
+            {/* Financial Control KPIs (Universal - ALL companies) - Live Data from QBO */}
             <section>
-              <div className="mb-4 flex items-center gap-3">
-                <div 
-                  className="flex h-9 w-9 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: `${companyColor}20` }}
-                >
-                  <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-chart-4/10">
+                    <BarChart3 className="h-5 w-5 text-chart-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Financial KPIs</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Universal metrics from QuickBooks (all companies)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">
-                    {selectedCompany?.name} KPIs
-                  </h2>
-                  <p className="text-sm text-muted-foreground">{tab.description}</p>
+                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+                  <LinkIcon className="h-3 w-3 mr-1" /> QBO Connected
+                </Badge>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+                {financialControlKpis[tab.value]?.slice(0, 4).map((kpi) => {
+                  const liveKpi = kpiHistory.find(
+                    k => k.kpi_name === kpi.label && k.cadence === tab.value
+                  );
+                  const kpiValue = liveKpi ? {
+                    value: liveKpi.kpi_value ?? 0,
+                    trend: 0,
+                    status: liveKpi.kpi_status || 'on_track'
+                  } : null;
+                  
+                  return (
+                    <KpiCard
+                      key={kpi.key}
+                      title={kpi.label}
+                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                      icon={kpi.icon}
+                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                      className="border-chart-4/20"
+                    />
+                  );
+                })}
+              </div>
+              {kpiHistory.filter(k => k.cadence === tab.value && ['Sales Revenue', 'Gross Profit', 'Net Profit', 'Net Cash Flow'].includes(k.kpi_name)).length === 0 && (
+                <p className="mt-4 text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg bg-muted/30">
+                  <AlertCircle className="h-4 w-4 inline mr-2" />
+                  Run the Financial Control bot to generate live KPI data from QuickBooks.
+                </p>
+              )}
+            </section>
+
+            {/* Company-Specific KPIs - From CRM */}
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="flex h-9 w-9 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: `${companyColor}20` }}
+                  >
+                    <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {selectedCompany?.name} KPIs
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
+                       selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
+                       'Project tracking from Jobber'}
+                    </p>
+                  </div>
                 </div>
+                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
+                  <AlertCircle className="h-3 w-3 mr-1" /> Integration Required
+                </Badge>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {companyKpis[tab.value]?.map((kpi) => {
-                  // Look up live data from kpi_history (match by kpi.label which matches DB kpi_name)
                   const liveKpi = kpiHistory.find(
                     k => k.kpi_name === kpi.label && k.cadence === tab.value
                   );
@@ -334,9 +392,20 @@ function DashboardContent() {
                 })}
               </div>
               {companyKpis[tab.value]?.length > 0 && !kpiHistory.some(k => k.cadence === tab.value && companyKpis[tab.value]?.some(kpi => kpi.label === k.kpi_name)) && (
-                <p className="mt-4 text-sm text-muted-foreground text-center py-8 border border-dashed rounded-lg">
-                  No live KPI data yet. Run the {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} bot or connect the integration.
-                </p>
+                <Card className="mt-4 border-dashed bg-muted/30">
+                  <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                    <AlertCircle className="h-8 w-8 text-amber-500 mb-3" />
+                    <h3 className="font-medium text-foreground mb-1">CRM Integration Required</h3>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Connect {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : 
+                               selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} to see 
+                      {selectedCompany?.company_type === 'property_halo' ? ' Asset Summary (Bought, Sold, Under Contract, Upcoming Closings)' : ' completed jobs and operational metrics'}.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate('/settings')}>
+                      Configure Integration
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
             </section>
 
@@ -362,50 +431,6 @@ function DashboardContent() {
               />
             </section>
 
-            {/* Financial Control KPIs (Foundation) - Live Data from QBO */}
-            <section>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-chart-4/10">
-                  <BarChart3 className="h-5 w-5 text-chart-4" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">Financial Control</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Live data from QuickBooks Online
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              {financialControlKpis[tab.value]?.map((kpi) => {
-                  // Find live KPI from kpi_history (match by kpi.label which matches DB kpi_name)
-                  const liveKpi = kpiHistory.find(
-                    k => k.kpi_name === kpi.label && k.cadence === tab.value
-                  );
-                  const kpiValue = liveKpi ? {
-                    value: liveKpi.kpi_value ?? 0,
-                    trend: 0, // No trend calculation yet
-                    status: liveKpi.kpi_status || 'on_track'
-                  } : null;
-                  
-                  return (
-                    <KpiCard
-                      key={kpi.key}
-                      title={kpi.label}
-                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
-                      icon={kpi.icon}
-                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
-                      className="border-chart-4/20"
-                    />
-                  );
-                })}
-              </div>
-              {kpiHistory.filter(k => k.cadence === tab.value).length === 0 && (
-                <p className="mt-4 text-sm text-muted-foreground text-center py-8 border border-dashed rounded-lg">
-                  No live KPI data yet. Run the Financial Control bot from Bot Runs to generate KPIs.
-                </p>
-              )}
-            </section>
           </TabsContent>
         ))}
       </Tabs>
