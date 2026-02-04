@@ -46,6 +46,9 @@ function DashboardContent() {
     }
   }, [user, authLoading, navigate]);
 
+  // Track which integrations are connected
+  const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
+
   // Fetch data when company changes
   useEffect(() => {
     if (!selectedCompany) return;
@@ -58,6 +61,16 @@ function DashboardContent() {
           .from('bots')
           .select('*');
         if (botsData) setBots(botsData as Bot[]);
+
+        // Fetch integrations to check what's connected
+        const { data: integrationsData } = await supabase
+          .from('integrations')
+          .select('*')
+          .eq('company_id', selectedCompany.id)
+          .eq('is_connected', true);
+        if (integrationsData) {
+          setConnectedIntegrations(integrationsData.map(i => i.integration_type));
+        }
 
         // Fetch exceptions for selected company (open/in_progress only for list)
         const { data: exceptionsData } = await supabase
@@ -94,7 +107,7 @@ function DashboardContent() {
           .limit(10);
         if (runsData) setBotRuns(runsData as BotRun[]);
 
-        // Fetch KPI history for charts
+        // Fetch KPI history for charts - ONLY live data
         const { data: kpiData } = await supabase
           .from('kpi_history')
           .select('*')
@@ -112,6 +125,23 @@ function DashboardContent() {
 
     fetchData();
   }, [selectedCompany]);
+
+  // Check if company-specific CRM is connected
+  const isCrmConnected = useMemo(() => {
+    if (!selectedCompany) return false;
+    switch (selectedCompany.company_type) {
+      case 'property_halo':
+        return connectedIntegrations.includes('pete_crm');
+      case 'unique_painting':
+        return connectedIntegrations.includes('labortech');
+      case 'ati_security':
+        return connectedIntegrations.includes('jobber');
+      default:
+        return false;
+    }
+  }, [selectedCompany, connectedIntegrations]);
+
+  const isQboConnected = connectedIntegrations.includes('quickbooks');
 
   // Get company type for conditional rendering - must be before useMemo hooks
   const companyType = selectedCompany?.company_type || 'property_halo';
@@ -137,40 +167,27 @@ function DashboardContent() {
     { value: 'quarterly', label: 'Quarterly', description: 'Quarterly strategic overview' },
   ];
 
-  const currentKpis = companyKpis[selectedCadence] || [];
+  // Only count KPIs that have connected integrations
+  const currentKpis = isCrmConnected 
+    ? [...financialControlKpis[selectedCadence], ...companyKpis[selectedCadence]] 
+    : financialControlKpis[selectedCadence] || [];
 
-  // Generate mock trend data for charts
+  // Only use real KPI history data for trend charts - NO mock data
   const trendChartData = useMemo(() => {
-    const periods = selectedCadence === 'daily' 
-      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      : selectedCadence === 'weekly'
-      ? ['Week 1', 'Week 2', 'Week 3', 'Week 4']
-      : selectedCadence === 'monthly'
-      ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-      : ['Q1', 'Q2', 'Q3', 'Q4'];
+    if (kpiHistory.length === 0) return [];
     
-    // Use real KPI history if available, otherwise generate mock data
-    if (kpiHistory.length > 0) {
-      const grouped: Record<string, Record<string, number>> = {};
-      kpiHistory.forEach(kpi => {
-        const period = new Date(kpi.period_end).toLocaleDateString('en-US', { month: 'short' });
-        if (!grouped[period]) grouped[period] = {};
-        grouped[period][kpi.kpi_name] = kpi.kpi_value || 0;
-      });
-      return Object.entries(grouped).slice(0, 6).map(([period, values]) => ({
-        period,
-        ...values
-      }));
-    }
-    
-    // Mock data
-    return periods.map((period, i) => ({
+    // Group by period and build chart data from live data only
+    const grouped: Record<string, Record<string, number>> = {};
+    kpiHistory.forEach(kpi => {
+      const period = new Date(kpi.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (!grouped[period]) grouped[period] = {};
+      grouped[period][kpi.kpi_name] = kpi.kpi_value || 0;
+    });
+    return Object.entries(grouped).slice(0, 7).reverse().map(([period, values]) => ({
       period,
-      Leads: 20 + Math.floor(Math.random() * 30) + i * 5,
-      Conversions: 5 + Math.floor(Math.random() * 15) + i * 2,
-      Revenue: 15000 + Math.floor(Math.random() * 10000) + i * 3000,
+      ...values
     }));
-  }, [selectedCadence, kpiHistory]);
+  }, [kpiHistory]);
 
   // Exception chart data
   const exceptionChartData = useMemo(() => {
@@ -240,20 +257,10 @@ function DashboardContent() {
 
   const handleExportKPIs = () => {
     if (kpiHistory.length === 0) {
-      toast.info('No KPI history to export yet - using mock data');
-      // Export mock data as example
-      const mockExport = currentKpis.map(kpi => ({
-        kpi_name: kpi.label,
-        kpi_value: Math.floor(Math.random() * 100),
-        kpi_status: 'on_track',
-        cadence: selectedCadence,
-        period_start: new Date().toISOString(),
-        period_end: new Date().toISOString(),
-      }));
-      exportKPIData(mockExport, selectedCompany?.name || 'company');
-    } else {
-      exportKPIData(kpiHistory, selectedCompany?.name || 'company');
+      toast.info('No live KPI data to export yet. Run the Financial Control bot first.');
+      return;
     }
+    exportKPIData(kpiHistory, selectedCompany?.name || 'company');
     toast.success('KPI data exported successfully');
   };
 
@@ -374,79 +381,97 @@ function DashboardContent() {
         )}
       </section>
 
-      {/* Company-Specific KPIs - From CRM */}
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div 
-              className="flex h-9 w-9 items-center justify-center rounded-xl"
-              style={{ backgroundColor: `${companyColor}20` }}
-            >
-              <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+      {/* Company-Specific KPIs - Only show if CRM is connected */}
+      {isCrmConnected ? (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div 
+                className="flex h-9 w-9 items-center justify-center rounded-xl"
+                style={{ backgroundColor: `${companyColor}20` }}
+              >
+                <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  {selectedCompany?.name} KPIs
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
+                   selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
+                   'Project tracking from Jobber'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                {selectedCompany?.name} KPIs
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
-                 selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
-                 'Project tracking from Jobber'}
-              </p>
-            </div>
+            <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">
+              <LinkIcon className="h-3 w-3 mr-1" /> Connected
+            </Badge>
           </div>
-          <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
-            <AlertCircle className="h-3 w-3 mr-1" /> Integration Required
-          </Badge>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
-          {companyKpis[selectedCadence]?.map((kpi) => {
-            const liveKpi = kpiHistory.find(
-              k => k.kpi_name === kpi.label && k.cadence === selectedCadence
-            );
-            const kpiValue = liveKpi ? {
-              value: liveKpi.kpi_value ?? 0,
-              trend: 0,
-              status: liveKpi.kpi_status || 'on_track'
-            } : null;
-            return (
-              <KpiCard
-                key={kpi.key}
-                title={kpi.label}
-                value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
-                icon={kpi.icon}
-                status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
-              />
-            );
-          })}
-        </div>
-        {companyKpis[selectedCadence]?.length > 0 && !kpiHistory.some(k => k.cadence === selectedCadence && companyKpis[selectedCadence]?.some(kpi => kpi.label === k.kpi_name)) && (
-          <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-muted/30 p-8 text-center">
-            <AlertCircle className="h-8 w-8 text-warning mx-auto mb-3" />
-            <h3 className="font-medium text-foreground mb-1">CRM Integration Required</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Connect {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : 
-                       selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} to see 
-              {selectedCompany?.company_type === 'property_halo' ? ' Asset Summary (Bought, Sold, Under Contract, Upcoming Closings)' : ' completed jobs and operational metrics'}.
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
+            {companyKpis[selectedCadence]?.map((kpi) => {
+              const liveKpi = kpiHistory.find(
+                k => k.kpi_name === kpi.label && k.cadence === selectedCadence
+              );
+              const kpiValue = liveKpi ? {
+                value: liveKpi.kpi_value ?? 0,
+                trend: 0,
+                status: liveKpi.kpi_status || 'on_track'
+              } : null;
+              return (
+                <KpiCard
+                  key={kpi.key}
+                  title={kpi.label}
+                  value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                  icon={kpi.icon}
+                  status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                  trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+                />
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <section>
+          <div className="rounded-2xl border border-dashed border-border/50 bg-muted/30 p-8 text-center">
+            <Building2 className="h-10 w-10 mx-auto mb-3" style={{ color: companyColor }} />
+            <h3 className="font-medium text-foreground mb-1">
+              {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : 
+               selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} Integration Required
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-1">
+              Connect your CRM to display live {selectedCompany?.name} KPIs including
+              {selectedCompany?.company_type === 'property_halo' ? ' Asset Summary (Bought, Sold, Under Contract, Upcoming Closings)' : 
+               selectedCompany?.company_type === 'unique_painting' ? ' Jobs Completed, Crew Utilization, and Revenue' : 
+               ' Installations, Contracts, and Project Revenue'}.
             </p>
-            <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => navigate('/settings')}>
+            <p className="text-xs text-muted-foreground/60 mb-4">
+              Only live data from connected integrations is displayed.
+            </p>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/settings')}>
               Configure Integration
             </Button>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* Charts Section */}
+      {/* Charts Section - Only show if we have live data */}
       <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <KpiTrendChart
-          title="Performance Trends"
-          data={trendChartData}
-          lines={[
-            { key: 'Leads', name: 'Leads', color: companyColor },
-            { key: 'Conversions', name: 'Conversions', color: 'hsl(var(--chart-2))' },
-          ]}
-        />
+        {trendChartData.length > 0 ? (
+          <KpiTrendChart
+            title="Performance Trends"
+            data={trendChartData}
+            lines={[
+              { key: 'Total Income', name: 'Income', color: 'hsl(var(--success))' },
+              { key: 'Total Expenses', name: 'Expenses', color: 'hsl(var(--destructive))' },
+            ]}
+          />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/50 bg-muted/30 p-8 text-center flex flex-col items-center justify-center min-h-[280px]">
+            <TrendingUp className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm text-muted-foreground">No trend data yet</p>
+            <p className="text-xs text-muted-foreground/60">Run bots to generate KPI history</p>
+          </div>
+        )}
         <ExceptionBarChart
           title="Exceptions by Severity"
           data={exceptionChartData}
