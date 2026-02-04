@@ -9,8 +9,8 @@ import { RecentReportsCard } from '@/components/dashboard/RecentReportsCard';
 import { KpiTrendChart } from '@/components/dashboard/KpiTrendChart';
 import { ExceptionBarChart } from '@/components/dashboard/ExceptionBarChart';
 import { PerformanceDonutChart } from '@/components/dashboard/PerformanceDonutChart';
+import { DateRangePicker, dateRangePresets } from '@/components/dashboard/DateRangePicker';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,19 +18,27 @@ import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building
 import { cn } from '@/lib/utils';
 import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import {
   getCompanyKpis,
   formatKpiValue,
   financialControlKpis,
 } from '@/config/kpiDefinitions';
-import type { Bot, Exception, EmailLog, BotRun, CadenceType, KpiHistory } from '@/types/database';
+import type { Bot, Exception, EmailLog, BotRun, KpiHistory } from '@/types/database';
 
 function DashboardContent() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { selectedCompany, isLoading: companyLoading } = useCompanySelector();
   
-  const [selectedCadence, setSelectedCadence] = useState<CadenceType>('daily');
+  // Date range state - default to last 30 days
+  const [selectedPreset, setSelectedPreset] = useState<string | null>('last30days');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const preset = dateRangePresets.find(p => p.value === 'last30days');
+    return preset?.getRange();
+  });
+  
   const [bots, setBots] = useState<Bot[]>([]);
   const [exceptions, setExceptions] = useState<Exception[]>([]);
   const [allExceptions, setAllExceptions] = useState<Exception[]>([]);
@@ -49,12 +57,16 @@ function DashboardContent() {
   // Track which integrations are connected
   const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
 
-  // Fetch data when company changes
+  // Fetch data when company or date range changes
   useEffect(() => {
-    if (!selectedCompany) return;
+    if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
     
     async function fetchData() {
       setIsLoading(true);
+      
+      const startDate = format(dateRange!.from!, 'yyyy-MM-dd');
+      const endDate = format(dateRange!.to!, 'yyyy-MM-dd');
+      
       try {
         // Fetch bots
         const { data: botsData } = await supabase
@@ -72,48 +84,58 @@ function DashboardContent() {
           setConnectedIntegrations(integrationsData.map(i => i.integration_type));
         }
 
-        // Fetch exceptions for selected company (open/in_progress only for list)
+        // Fetch exceptions for selected company and date range (open/in_progress only for list)
         const { data: exceptionsData } = await supabase
           .from('exceptions')
           .select('*')
           .eq('company_id', selectedCompany.id)
           .in('status', ['open', 'in_progress'])
+          .gte('created_at', startDate)
+          .lte('created_at', endDate + 'T23:59:59')
           .order('created_at', { ascending: false })
           .limit(5);
         if (exceptionsData) setExceptions(exceptionsData as Exception[]);
 
-        // Fetch ALL exceptions for charts
+        // Fetch ALL exceptions for charts within date range
         const { data: allExceptionsData } = await supabase
           .from('exceptions')
           .select('*')
-          .eq('company_id', selectedCompany.id);
+          .eq('company_id', selectedCompany.id)
+          .gte('created_at', startDate)
+          .lte('created_at', endDate + 'T23:59:59');
         if (allExceptionsData) setAllExceptions(allExceptionsData as Exception[]);
 
-        // Fetch recent emails
+        // Fetch recent emails within date range
         const { data: emailsData } = await supabase
           .from('email_logs')
           .select('*')
           .eq('company_id', selectedCompany.id)
+          .gte('created_at', startDate)
+          .lte('created_at', endDate + 'T23:59:59')
           .order('created_at', { ascending: false })
           .limit(5);
         if (emailsData) setRecentEmails(emailsData as EmailLog[]);
 
-        // Fetch recent bot runs
+        // Fetch recent bot runs within date range
         const { data: runsData } = await supabase
           .from('bot_runs')
           .select('*')
           .eq('company_id', selectedCompany.id)
+          .gte('created_at', startDate)
+          .lte('created_at', endDate + 'T23:59:59')
           .order('created_at', { ascending: false })
           .limit(10);
         if (runsData) setBotRuns(runsData as BotRun[]);
 
-        // Fetch KPI history for charts - ONLY live data
+        // Fetch KPI history within date range
         const { data: kpiData } = await supabase
           .from('kpi_history')
           .select('*')
           .eq('company_id', selectedCompany.id)
+          .gte('period_end', startDate)
+          .lte('period_end', endDate)
           .order('period_end', { ascending: false })
-          .limit(100);
+          .limit(500);
         if (kpiData) setKpiHistory(kpiData as KpiHistory[]);
 
       } catch (error) {
@@ -124,7 +146,7 @@ function DashboardContent() {
     }
 
     fetchData();
-  }, [selectedCompany]);
+  }, [selectedCompany, dateRange]);
 
   // Check if company-specific CRM is connected
   const isCrmConnected = useMemo(() => {
@@ -160,17 +182,9 @@ function DashboardContent() {
     bot_name: bots.find(b => b.id === email.bot_id)?.name
   })), [recentEmails, bots]);
 
-  const cadenceTabs: { value: CadenceType; label: string; description: string }[] = [
-    { value: 'daily', label: 'Daily', description: 'Daily operational metrics' },
-    { value: 'weekly', label: 'Weekly', description: 'Weekly performance trends' },
-    { value: 'monthly', label: 'Monthly', description: 'Monthly financial summary' },
-    { value: 'quarterly', label: 'Quarterly', description: 'Quarterly strategic overview' },
-  ];
-
-  // Only count KPIs that have connected integrations
-  const currentKpis = isCrmConnected 
-    ? [...financialControlKpis[selectedCadence], ...companyKpis[selectedCadence]] 
-    : financialControlKpis[selectedCadence] || [];
+  // Get KPIs for display - use 'daily' as default format since we're now range-based
+  const displayKpis = financialControlKpis['daily'] || [];
+  const companyDisplayKpis = companyKpis['daily'] || [];
 
   // Only use real KPI history data for trend charts - NO mock data
   const trendChartData = useMemo(() => {
@@ -183,7 +197,7 @@ function DashboardContent() {
       if (!grouped[period]) grouped[period] = {};
       grouped[period][kpi.kpi_name] = kpi.kpi_value || 0;
     });
-    return Object.entries(grouped).slice(0, 7).reverse().map(([period, values]) => ({
+    return Object.entries(grouped).slice(0, 14).reverse().map(([period, values]) => ({
       period,
       ...values
     }));
@@ -207,17 +221,24 @@ function DashboardContent() {
 
   // KPI status distribution based on live data
   const kpiStatusData = useMemo(() => {
-    // Count statuses from live kpi_history for current cadence
-    const relevantKpis = kpiHistory.filter(k => k.cadence === selectedCadence);
-    const onTrack = relevantKpis.filter(k => k.kpi_status === 'on_track').length;
-    const warning = relevantKpis.filter(k => k.kpi_status === 'warning').length;
-    const critical = relevantKpis.filter(k => k.kpi_status === 'critical').length;
+    // Get unique KPIs (most recent per kpi_name)
+    const uniqueKpis = new Map<string, KpiHistory>();
+    kpiHistory.forEach(k => {
+      const existing = uniqueKpis.get(k.kpi_name);
+      if (!existing || new Date(k.period_end) > new Date(existing.period_end)) {
+        uniqueKpis.set(k.kpi_name, k);
+      }
+    });
+    const latestKpis = Array.from(uniqueKpis.values());
+    const onTrack = latestKpis.filter(k => k.kpi_status === 'on_track').length;
+    const warning = latestKpis.filter(k => k.kpi_status === 'warning').length;
+    const critical = latestKpis.filter(k => k.kpi_status === 'critical').length;
     return [
       { name: 'On Track', value: onTrack || 0, color: 'hsl(var(--success))' },
       { name: 'Warning', value: warning || 0, color: 'hsl(var(--warning))' },
       { name: 'Critical', value: critical || 0, color: 'hsl(var(--destructive))' },
     ];
-  }, [kpiHistory, selectedCadence]);
+  }, [kpiHistory]);
 
   // Early returns AFTER all hooks - Show skeleton loading instead of spinner
   if (authLoading || companyLoading) {
@@ -234,7 +255,7 @@ function DashboardContent() {
             <div className="h-10 w-24 bg-muted animate-pulse rounded-lg" />
           </div>
         </div>
-        {/* Tabs Skeleton */}
+        {/* Date Range Skeleton */}
         <div className="h-12 w-80 bg-muted animate-pulse rounded-lg" />
         {/* KPI Cards Skeleton */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -271,6 +292,27 @@ function DashboardContent() {
     emailsSent: recentEmails.length,
   };
 
+  // Get date range display text
+  const dateRangeText = dateRange?.from && dateRange?.to
+    ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+    : 'All time';
+
+  // Get aggregated KPI values for the date range (sum or average depending on type)
+  const getAggregatedKpiValue = (kpiLabel: string) => {
+    const matchingKpis = kpiHistory.filter(k => k.kpi_name === kpiLabel);
+    if (matchingKpis.length === 0) return null;
+    
+    // For most KPIs, show the most recent value
+    const mostRecent = matchingKpis.reduce((latest, current) => 
+      new Date(current.period_end) > new Date(latest.period_end) ? current : latest
+    );
+    
+    return {
+      value: mostRecent.kpi_value ?? 0,
+      status: mostRecent.kpi_status || 'on_track'
+    };
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -284,7 +326,7 @@ function DashboardContent() {
                   className="h-2 w-2 rounded-full"
                   style={{ backgroundColor: companyColor }}
                 />
-                {selectedCompany.name} — Performance Overview
+                {selectedCompany.name} — {dateRangeText}
               </span>
             ) : 'Select a company to view data'}
           </p>
@@ -308,24 +350,14 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Cadence Tabs - Pill style */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-2">
-          {cadenceTabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setSelectedCadence(tab.value)}
-              className={cn(
-                'px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
-                selectedCadence === tab.value
-                  ? 'bg-foreground text-background shadow-sm'
-                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Date Range Picker */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <DateRangePicker
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          selectedPreset={selectedPreset}
+          onPresetChange={setSelectedPreset}
+        />
         <Button variant="outline" size="sm" onClick={handleExportKPIs} className="rounded-full transition-all duration-200">
           <Download className="h-4 w-4 mr-2" />
           Export
@@ -351,15 +383,8 @@ function DashboardContent() {
           </Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 stagger-children">
-          {financialControlKpis[selectedCadence]?.slice(0, 4).map((kpi) => {
-            const liveKpi = kpiHistory.find(
-              k => k.kpi_name === kpi.label && k.cadence === selectedCadence
-            );
-            const kpiValue = liveKpi ? {
-              value: liveKpi.kpi_value ?? 0,
-              trend: 0,
-              status: liveKpi.kpi_status || 'on_track'
-            } : null;
+          {displayKpis.slice(0, 4).map((kpi) => {
+            const kpiValue = getAggregatedKpiValue(kpi.label);
             
             return (
               <KpiCard
@@ -368,12 +393,11 @@ function DashboardContent() {
                 value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
                 icon={kpi.icon}
                 status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
               />
             );
           })}
         </div>
-        {kpiHistory.filter(k => k.cadence === selectedCadence && ['Sales Revenue', 'Gross Profit', 'Net Profit', 'Net Cash Flow'].includes(k.kpi_name)).length === 0 && (
+        {kpiHistory.filter(k => ['Sales Revenue', 'Gross Profit', 'Net Profit', 'Net Cash Flow'].includes(k.kpi_name)).length === 0 && (
           <p className="mt-4 text-sm text-muted-foreground text-center py-6 border border-dashed rounded-2xl bg-muted/30">
             <AlertCircle className="h-4 w-4 inline mr-2" />
             Run the Financial Control bot to generate live KPI data from QuickBooks.
@@ -408,15 +432,8 @@ function DashboardContent() {
             </Badge>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
-            {companyKpis[selectedCadence]?.map((kpi) => {
-              const liveKpi = kpiHistory.find(
-                k => k.kpi_name === kpi.label && k.cadence === selectedCadence
-              );
-              const kpiValue = liveKpi ? {
-                value: liveKpi.kpi_value ?? 0,
-                trend: 0,
-                status: liveKpi.kpi_status || 'on_track'
-              } : null;
+            {companyDisplayKpis.map((kpi) => {
+              const kpiValue = getAggregatedKpiValue(kpi.label);
               return (
                 <KpiCard
                   key={kpi.key}
@@ -424,7 +441,6 @@ function DashboardContent() {
                   value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
                   icon={kpi.icon}
                   status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                  trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
                 />
               );
             })}
@@ -480,7 +496,7 @@ function DashboardContent() {
           title="KPI Status"
           data={kpiStatusData}
           centerLabel="KPIs"
-          centerValue={currentKpis.length}
+          centerValue={kpiStatusData.reduce((sum, item) => sum + item.value, 0)}
         />
       </section>
 
