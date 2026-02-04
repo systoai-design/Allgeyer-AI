@@ -23,3 +23,15 @@ verify_jwt = false
 
 [functions.test-webhook]
 verify_jwt = false
+
+[functions.jobber-oauth]
+verify_jwt = false
+
+[functions.jobber-oauth-callback]
+verify_jwt = false
+
+[functions.jobber-api]
+verify_jwt = false
+
+[functions.jobber-webhook]
+verify_jwt = false

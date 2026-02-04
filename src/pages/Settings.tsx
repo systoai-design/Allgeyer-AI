@@ -18,7 +18,8 @@ function SettingsContent() {
   const { selectedCompany, availableCompanies } = useCompanySelector();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(true);
-  const [connecting, setConnecting] = useState(false);
+  const [connectingQBO, setConnectingQBO] = useState(false);
+  const [connectingJobber, setConnectingJobber] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -54,9 +55,8 @@ function SettingsContent() {
       return;
     }
 
-    setConnecting(true);
+    setConnectingQBO(true);
     try {
-      // Build the URL with query params for authorization
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qbo-oauth?action=authorize&company_id=${selectedCompany.id}`,
         {
@@ -89,12 +89,10 @@ function SettingsContent() {
       const pollTimer = setInterval(() => {
         if (popup?.closed) {
           clearInterval(pollTimer);
-          setConnecting(false);
+          setConnectingQBO(false);
           
-          // Dispatch custom event to refresh the overview table
           window.dispatchEvent(new CustomEvent('qbo-connection-updated'));
           
-          // Refresh integrations for current company
           if (selectedCompany) {
             supabase
               .from('integrations')
@@ -112,7 +110,72 @@ function SettingsContent() {
     } catch (error) {
       console.error('Error connecting to QBO:', error);
       toast.error('Failed to initiate QuickBooks connection');
-      setConnecting(false);
+      setConnectingQBO(false);
+    }
+  };
+
+  const handleConnectJobber = async () => {
+    if (!selectedCompany) {
+      toast.error('Please select a company first');
+      return;
+    }
+
+    setConnectingJobber(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/jobber-oauth?action=authorize&company_id=${selectedCompany.id}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Open OAuth popup
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        result.auth_url,
+        'Jobber Authorization',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      // Poll for popup close
+      const pollTimer = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(pollTimer);
+          setConnectingJobber(false);
+          
+          window.dispatchEvent(new CustomEvent('jobber-connection-updated'));
+          
+          if (selectedCompany) {
+            supabase
+              .from('integrations')
+              .select('*')
+              .eq('company_id', selectedCompany.id)
+              .then(({ data }) => {
+                if (data) setIntegrations(data as Integration[]);
+              });
+          }
+          
+          toast.success('Jobber connection updated - refreshing status...');
+        }
+      }, 500);
+
+    } catch (error) {
+      console.error('Error connecting to Jobber:', error);
+      toast.error('Failed to initiate Jobber connection');
+      setConnectingJobber(false);
     }
   };
 
@@ -135,8 +198,30 @@ function SettingsContent() {
     }
   };
 
+  const handleDisconnectJobber = async (integrationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('integrations')
+        .update({ is_connected: false, config: {} })
+        .eq('id', integrationId);
+
+      if (error) throw error;
+
+      toast.success('Jobber disconnected');
+      setIntegrations(prev => 
+        prev.map(i => i.id === integrationId ? { ...i, is_connected: false, config: {} } : i)
+      );
+    } catch (error) {
+      console.error('Error disconnecting Jobber:', error);
+      toast.error('Failed to disconnect Jobber');
+    }
+  };
+
   const qboIntegration = integrations.find(i => i.integration_type === 'quickbooks');
   const isQBOConnected = qboIntegration?.is_connected;
+  
+  const jobberIntegration = integrations.find(i => i.integration_type === 'jobber');
+  const isJobberConnected = jobberIntegration?.is_connected;
 
   if (authLoading) {
     return (
@@ -165,7 +250,7 @@ function SettingsContent() {
             }
           }}
           onConnectQBO={handleConnectQBO}
-          connecting={connecting}
+          connecting={connectingQBO}
         />
       )}
 
@@ -239,9 +324,9 @@ function SettingsContent() {
                 <Button
                   className="w-full rounded-full bg-[#2CA01C] hover:bg-[#248017] text-white"
                   onClick={handleConnectQBO}
-                  disabled={connecting || loadingIntegrations}
+                  disabled={connectingQBO || loadingIntegrations}
                 >
-                  {connecting ? (
+                  {connectingQBO ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Connecting...
@@ -263,6 +348,100 @@ function SettingsContent() {
         </div>
       </div>
 
+      {/* Jobber Integration Card */}
+      <div id="jobber-integration-card" className="rounded-2xl border border-border/50 bg-card">
+        <div className="p-5 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#7AC142]/10">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#7AC142">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Jobber</h2>
+                <p className="text-sm text-muted-foreground">Jobs, clients & invoices</p>
+              </div>
+            </div>
+            {isJobberConnected ? (
+              <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                Connected
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
+                <XCircle className="mr-1 h-3 w-3" />
+                Not Connected
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="p-5">
+          {selectedCompany ? (
+            <>
+              <div className="rounded-xl bg-muted/40 p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Company</p>
+                    <p className="text-base font-semibold">{selectedCompany.name}</p>
+                  </div>
+                  {isJobberConnected && jobberIntegration?.last_sync_at && (
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Last Sync</p>
+                      <p className="text-sm font-medium">
+                        {new Date(jobberIntegration.last_sync_at).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isJobberConnected ? (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 rounded-full"
+                    onClick={() => toast.info('Jobber sync functionality coming soon')}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Sync Now
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="rounded-full"
+                    onClick={() => jobberIntegration && handleDisconnectJobber(jobberIntegration.id)}
+                  >
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full rounded-full bg-[#7AC142] hover:bg-[#6ab038] text-white"
+                  onClick={handleConnectJobber}
+                  disabled={connectingJobber || loadingIntegrations}
+                >
+                  {connectingJobber ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Connect to Jobber
+                    </>
+                  )}
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-4 text-muted-foreground">
+              <p>Please select a company from the sidebar to manage integrations.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Other Integrations Card */}
       <div className="rounded-2xl border border-border/50 bg-card">
         <div className="p-5 border-b border-border/50">
@@ -270,11 +449,10 @@ function SettingsContent() {
           <p className="text-sm text-muted-foreground mt-0.5">Additional platform connections</p>
         </div>
         <div className="p-5">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             {[
               { name: 'PETE CRM', description: 'Real estate lead tracking', company: 'Property Halo' },
               { name: 'Labortech', description: 'Lead management', company: 'Unique Painting, ATI Security' },
-              { name: 'Jobber', description: 'Jobs and estimates', company: 'Unique Painting, ATI Security' },
             ].map((integration) => (
               <div
                 key={integration.name}
