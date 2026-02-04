@@ -174,12 +174,18 @@ serve(async (req) => {
       const config = integration.config as JobberTokens;
       let accessToken = config.access_token;
       
-      // Check if token needs refresh
-      const tokenExpiresAt = new Date(config.token_expires_at);
-      const now = new Date();
-      
-      if (now >= new Date(tokenExpiresAt.getTime() - 5 * 60 * 1000)) {
-        console.log('Jobber token expired, refreshing...');
+      // Token refresh function - can be called if API returns expired error
+      const refreshToken = async (): Promise<string | null> => {
+        console.log('Force refreshing Jobber token...');
+        
+        // Re-fetch integration to get latest refresh token
+        const { data: latestInt } = await supabase
+          .from('integrations')
+          .select('config')
+          .eq('id', integration.id)
+          .single();
+        
+        const latestConfig = (latestInt?.config || config) as JobberTokens;
         
         const tokenResponse = await fetch(JOBBER_TOKEN_URL, {
           method: 'POST',
@@ -188,7 +194,7 @@ serve(async (req) => {
             grant_type: 'refresh_token',
             client_id: jobberClientId!,
             client_secret: jobberClientSecret!,
-            refresh_token: config.refresh_token,
+            refresh_token: latestConfig.refresh_token,
           }),
         });
 
@@ -197,11 +203,7 @@ serve(async (req) => {
         if (!tokenResponse.ok) {
           console.error('Jobber token refresh failed:', tokens);
           await supabase.from('integrations').update({ is_connected: false }).eq('id', integration.id);
-          await updateBotRunFailed(supabase, bot_run_id, 'Token refresh failed. Please reconnect Jobber.');
-          return new Response(
-            JSON.stringify({ error: 'Token refresh failed' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-          );
+          return null;
         }
 
         accessToken = tokens.access_token;
@@ -209,7 +211,7 @@ serve(async (req) => {
         
         await supabase.from('integrations').update({
           config: {
-            ...config,
+            ...latestConfig,
             access_token: tokens.access_token,
             refresh_token: tokens.refresh_token,
             token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
@@ -218,10 +220,27 @@ serve(async (req) => {
         }).eq('id', integration.id);
         
         console.log('Jobber token refreshed successfully');
+        return tokens.access_token;
+      };
+      
+      // Check if token needs refresh before starting
+      const tokenExpiresAt = new Date(config.token_expires_at);
+      const now = new Date();
+      
+      if (now >= new Date(tokenExpiresAt.getTime() - 5 * 60 * 1000)) {
+        const newToken = await refreshToken();
+        if (!newToken) {
+          await updateBotRunFailed(supabase, bot_run_id, 'Token refresh failed. Please reconnect Jobber.');
+          return new Response(
+            JSON.stringify({ error: 'Token refresh failed' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+          );
+        }
+        accessToken = newToken;
       }
 
-      // Fetch KPIs from Jobber GraphQL API
-      kpis = await fetchJobberKPIs(accessToken, periodStart, periodEnd);
+      // Fetch KPIs from Jobber GraphQL API with token refresh callback
+      kpis = await fetchJobberKPIs(accessToken, periodStart, periodEnd, refreshToken);
       
       console.log('Jobber KPIs fetched:', kpis);
 
@@ -298,8 +317,9 @@ serve(async (req) => {
   }
 });
 
-async function fetchJobberKPIs(accessToken: string, periodStart: string, periodEnd: string): Promise<Record<string, number>> {
+async function fetchJobberKPIs(accessToken: string, periodStart: string, periodEnd: string, onTokenExpired?: () => Promise<string | null>): Promise<Record<string, number>> {
   const kpis: Record<string, number> = {};
+  let currentToken = accessToken;
 
   // Query for requests count - just get totalCount and basic info
   const requestsQuery = `
@@ -312,8 +332,7 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
         }
         totalCount
       }
-    }
-  `;
+    `;
 
   // Query for quotes
   const quotesQuery = `
@@ -364,9 +383,20 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
   `;
 
   try {
-    // Fetch requests
-    const requestsResponse = await makeJobberRequest(accessToken, requestsQuery);
+    // Fetch requests - check for token expiration on first call
+    let requestsResponse = await makeJobberRequest(currentToken, requestsQuery);
     console.log('Requests response:', JSON.stringify(requestsResponse));
+    
+    // If token expired during request, try to refresh and retry
+    if (requestsResponse?.message === 'Access token expired' && onTokenExpired) {
+      console.log('Token expired during request, attempting refresh...');
+      const newToken = await onTokenExpired();
+      if (newToken) {
+        currentToken = newToken;
+        requestsResponse = await makeJobberRequest(currentToken, requestsQuery);
+      }
+    }
+    
     if (requestsResponse?.data?.requests) {
       const totalCount = requestsResponse.data.requests.totalCount || 0;
       const requests = requestsResponse.data.requests.nodes || [];
@@ -377,7 +407,7 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
     }
 
     // Fetch quotes
-    const quotesResponse = await makeJobberRequest(accessToken, quotesQuery);
+    const quotesResponse = await makeJobberRequest(currentToken, quotesQuery);
     if (quotesResponse?.data?.quotes) {
       const quotes = quotesResponse.data.quotes.nodes || [];
       const approvedQuotes = quotes.filter((q: any) => q.quoteStatus === 'APPROVED');
@@ -391,7 +421,7 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
     }
 
     // Fetch jobs
-    const jobsResponse = await makeJobberRequest(accessToken, jobsQuery);
+    const jobsResponse = await makeJobberRequest(currentToken, jobsQuery);
     if (jobsResponse?.data?.jobs) {
       const jobs = jobsResponse.data.jobs.nodes || [];
       const activeJobs = jobs.filter((j: any) => 
@@ -401,7 +431,7 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
     }
 
     // Fetch invoices
-    const invoicesResponse = await makeJobberRequest(accessToken, invoicesQuery);
+    const invoicesResponse = await makeJobberRequest(currentToken, invoicesQuery);
     if (invoicesResponse?.data?.invoices) {
       const invoices = invoicesResponse.data.invoices.nodes || [];
       const pendingInvoices = invoices.filter((i: any) => 
