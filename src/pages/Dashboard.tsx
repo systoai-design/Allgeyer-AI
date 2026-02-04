@@ -395,14 +395,14 @@ function DashboardContent() {
     ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
     : 'All time';
 
-  // Get aggregated KPI values for the date range (sum or average depending on type)
+  // Get aggregated KPI values for the date range - use most recently created record
   const getAggregatedKpiValue = (kpiLabel: string) => {
     const matchingKpis = kpiHistory.filter(k => k.kpi_name === kpiLabel);
     if (matchingKpis.length === 0) return null;
     
-    // For most KPIs, show the most recent value
+    // Use created_at to get the truly most recent record (handles multiple records with same period_end)
     const mostRecent = matchingKpis.reduce((latest, current) => 
-      new Date(current.period_end) > new Date(latest.period_end) ? current : latest
+      new Date(current.created_at) > new Date(latest.created_at) ? current : latest
     );
     
     return {
