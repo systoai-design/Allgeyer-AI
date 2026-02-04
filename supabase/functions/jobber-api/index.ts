@@ -137,7 +137,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-JOBBER-GRAPHQL-VERSION': '2024-06-03',
+        'X-JOBBER-GRAPHQL-VERSION': '2023-08-18',
       },
       body: JSON.stringify({ query, variables }),
     });
