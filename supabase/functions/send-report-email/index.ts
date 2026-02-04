@@ -1,4 +1,5 @@
 import "https://deno.land/std@0.224.0/dotenv/load.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ReportData, CompanyBranding } from './_templates/base.ts';
 import { generateDailyReport } from './_templates/daily.ts';
 import { generateWeeklyReport } from './_templates/weekly.ts';
@@ -6,6 +7,8 @@ import { generateMonthlyReport } from './_templates/monthly.ts';
 import { generateQuarterlyReport } from './_templates/quarterly.ts';
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +18,9 @@ const corsHeaders = {
 interface ReportEmailRequest {
   to: string[];
   cc?: string[];
+  company_id?: string;
+  bot_id?: string;
+  bot_run_id?: string;
   company: {
     name: string;
     primary_color?: string;
@@ -92,6 +98,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
   try {
     const data: ReportEmailRequest = await req.json();
 
@@ -130,6 +138,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     console.log("Email sent successfully:", result);
+
+    // Log the email to the database if company_id and bot_id are provided
+    if (data.company_id && data.bot_id) {
+      const emailLogData = {
+        company_id: data.company_id,
+        bot_id: data.bot_id,
+        bot_run_id: data.bot_run_id || null,
+        cadence: data.cadence,
+        subject: subject,
+        recipients: {
+          to: data.to,
+          cc: data.cc || []
+        },
+        html_content: html,
+        sent_at: new Date().toISOString(),
+        delivery_status: 'sent',
+        resend_id: result.id
+      };
+
+      const { error: logError } = await supabase
+        .from('email_logs')
+        .insert(emailLogData);
+
+      if (logError) {
+        console.error("Failed to log email:", logError);
+        // Don't fail the request, email was still sent
+      } else {
+        console.log("Email logged to database");
+      }
+    } else {
+      console.log("Skipping email log: missing company_id or bot_id");
+    }
 
     return new Response(
       JSON.stringify({ 
