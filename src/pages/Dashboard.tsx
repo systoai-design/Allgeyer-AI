@@ -242,6 +242,9 @@ function DashboardContent() {
 
       if (showToast) toast.success('Data synced successfully!', { id: 'sync-toast' });
       
+      // Small delay to ensure database writes are committed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Refresh dashboard data
       await fetchData();
       return true;
@@ -263,17 +266,26 @@ function DashboardContent() {
     const rangeKey = `${selectedCompany.id}_${getDateRangeKey(dateRange)}`;
     
     // Don't auto-sync if we've already done it for this range
-    if (hasAutoSynced.has(rangeKey)) return;
+    if (hasAutoSynced.has(rangeKey)) {
+      // Still fetch data even if we've synced before (handles page refresh)
+      await fetchData();
+      return;
+    }
     
     // Fetch data first to see if we have any
-    const kpiData = await fetchData();
+    setIsLoading(true);
+    const kpiData = await fetchData(true); // Skip loading state to avoid flicker
     
     // If no KPI data exists for this range, trigger auto-sync
     if (!kpiData || kpiData.length === 0) {
       console.log('No data for range, auto-syncing...');
       setHasAutoSynced(prev => new Set([...prev, rangeKey]));
       await performSync(true);
+    } else {
+      // Data exists, just mark as synced so we don't re-sync
+      setHasAutoSynced(prev => new Set([...prev, rangeKey]));
     }
+    setIsLoading(false);
   }, [selectedCompany, dateRange, isSyncing, hasAutoSynced, fetchData, performSync]);
 
   // Detect date range changes and trigger auto-sync
