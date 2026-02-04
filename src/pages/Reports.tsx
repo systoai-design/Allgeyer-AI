@@ -54,35 +54,31 @@ function ReportCard({ email, botName }: ReportCardProps) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="group cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] hover:border-primary/20 active:scale-[0.98]">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-base font-medium truncate group-hover:text-primary transition-colors">
-                  {email.subject}
-                </CardTitle>
-                <CardDescription className="text-sm mt-1">
-                  {botName}
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className={cn('gap-1 shrink-0', statusStyles[email.delivery_status])}>
-                <StatusIcon className="h-3 w-3" />
-                {email.delivery_status}
-              </Badge>
+        <div className="group cursor-pointer rounded-2xl border border-border/50 bg-card p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate group-hover:text-foreground transition-colors">
+                {email.subject}
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {botName}
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5" />
-                {email.sent_at ? format(parseISO(email.sent_at), 'MMM d, yyyy') : 'Pending'}
-              </div>
-              <span>{toCount} recipient{toCount !== 1 ? 's' : ''}</span>
+            <Badge variant="secondary" className={cn('gap-1 shrink-0', statusStyles[email.delivery_status])}>
+              <StatusIcon className="h-3 w-3" />
+              {email.delivery_status}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5" />
+              {email.sent_at ? format(parseISO(email.sent_at), 'MMM d, yyyy') : 'Pending'}
             </div>
-          </CardContent>
-        </Card>
+            <span>{toCount} recipient{toCount !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle>{email.subject}</DialogTitle>
           <DialogDescription className="flex flex-wrap gap-2 pt-2">
@@ -94,7 +90,7 @@ function ReportCard({ email, botName }: ReportCardProps) {
             </span>
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4 border rounded-lg bg-background p-4">
+        <div className="mt-4 border border-border/50 rounded-xl bg-background p-4">
           {email.html_content ? (
             <div
               className="prose prose-sm max-w-none dark:prose-invert"
@@ -111,23 +107,19 @@ function ReportCard({ email, botName }: ReportCardProps) {
 
 function ReportCardSkeleton() {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-4 w-1/3" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
+    <div className="rounded-2xl border border-border/50 bg-card p-5">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/3" />
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-16" />
-        </div>
-      </CardContent>
-    </Card>
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+    </div>
   );
 }
 
@@ -203,93 +195,81 @@ function ReportsContent() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground">Browse historical reports by cadence</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="text-muted-foreground text-sm mt-1">Browse historical reports by cadence</p>
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search reports..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 w-full sm:w-[280px]"
+            className="pl-10 w-full sm:w-[280px] bg-muted/40 border-0 rounded-xl"
           />
         </div>
       </div>
 
-      <Tabs value={activeCadence} onValueChange={setActiveCadence} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="all" className="gap-2">
-            All
-            <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-xs">
-              {cadenceCounts.all}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="daily" className="gap-2">
-            Daily
-            <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-xs">
-              {cadenceCounts.daily}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="weekly" className="gap-2">
-            Weekly
-            <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-xs">
-              {cadenceCounts.weekly}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="monthly" className="gap-2">
-            Monthly
-            <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-xs">
-              {cadenceCounts.monthly}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="quarterly" className="gap-2">
-            Quarterly
-            <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-xs">
-              {cadenceCounts.quarterly}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* Pill-style filter buttons */}
+      <div className="flex gap-2 flex-wrap">
+        {(['all', 'daily', 'weekly', 'monthly', 'quarterly'] as const).map((cadence) => (
+          <button
+            key={cadence}
+            onClick={() => setActiveCadence(cadence)}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2',
+              activeCadence === cadence
+                ? 'bg-foreground text-background shadow-sm'
+                : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+            )}
+          >
+            {cadence.charAt(0).toUpperCase() + cadence.slice(1)}
+            <span className={cn(
+              'text-xs px-1.5 py-0.5 rounded-full',
+              activeCadence === cadence ? 'bg-background/20' : 'bg-muted-foreground/10'
+            )}>
+              {cadenceCounts[cadence]}
+            </span>
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value={activeCadence} className="animate-fade-in">
-          {isLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <ReportCardSkeleton key={i} />
-              ))}
+      {/* Content */}
+      <div className="animate-fade-in">
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ReportCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredEmails.length === 0 ? (
+          <div className="rounded-2xl border border-border/50 bg-card p-12 text-center">
+            <div className="rounded-full bg-muted p-4 inline-block mb-4">
+              <FileText className="h-8 w-8 text-muted-foreground" />
             </div>
-          ) : filteredEmails.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="rounded-full bg-muted p-4 mb-4">
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-lg font-medium">No reports found</p>
-                <p className="text-muted-foreground text-center max-w-md mt-1">
-                  {searchQuery
-                    ? 'Try adjusting your search query'
-                    : activeCadence !== 'all'
-                    ? `No ${activeCadence} reports have been generated yet`
-                    : 'Once bots run and send reports, they will appear here'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
-              {filteredEmails.map((email) => (
-                <ReportCard
-                  key={email.id}
-                  email={email}
-                  botName={getBotName(email.bot_id)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+            <p className="text-lg font-medium">No reports found</p>
+            <p className="text-muted-foreground mt-1 max-w-md mx-auto">
+              {searchQuery
+                ? 'Try adjusting your search query'
+                : activeCadence !== 'all'
+                ? `No ${activeCadence} reports have been generated yet`
+                : 'Once bots run and send reports, they will appear here'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
+            {filteredEmails.map((email) => (
+              <ReportCard
+                key={email.id}
+                email={email}
+                botName={getBotName(email.bot_id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

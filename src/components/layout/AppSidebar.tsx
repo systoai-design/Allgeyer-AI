@@ -99,27 +99,27 @@ export function AppSidebar() {
         </Select>
       </div>
 
-      <Separator className="bg-sidebar-border my-2" />
+      <Separator className="bg-sidebar-border/50 my-2" />
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-2">
+      <nav className="flex-1 space-y-0.5 px-3 py-2">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
               cn(
-                'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:translate-x-0.5'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
               )
             }
           >
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sidebar-primary rounded-r-full" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-sidebar-primary rounded-r-full" />
                 )}
                 <item.icon className="h-4 w-4" />
                 {item.label}
@@ -130,8 +130,8 @@ export function AppSidebar() {
 
         {isSuperAdmin && (
           <>
-            <div className="pt-4">
-              <p className="px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+            <div className="pt-5 pb-1">
+              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
                 Admin
               </p>
             </div>
@@ -141,17 +141,17 @@ export function AppSidebar() {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200',
+                    'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:translate-x-0.5'
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
                   )
                 }
               >
                 {({ isActive }) => (
                   <>
                     {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sidebar-primary rounded-r-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-sidebar-primary rounded-r-full" />
                     )}
                     <item.icon className="h-4 w-4" />
                     {item.label}
@@ -164,10 +164,10 @@ export function AppSidebar() {
       </nav>
 
       {/* User Section */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-3">
+      <div className="border-t border-sidebar-border/50 p-3">
+        <div className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-sidebar-accent/30">
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm">
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -175,14 +175,14 @@ export function AppSidebar() {
             <p className="truncate text-sm font-medium text-sidebar-foreground">
               {profile?.full_name || 'User'}
             </p>
-            <p className="truncate text-xs text-sidebar-foreground/60">
+            <p className="truncate text-xs text-sidebar-foreground/50">
               {profile?.email}
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg"
             onClick={() => signOut()}
           >
             <LogOut className="h-4 w-4" />

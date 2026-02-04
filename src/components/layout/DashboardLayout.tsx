@@ -12,7 +12,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <AppSidebar />
       </div>
       <main className="ml-64 flex-1 overflow-auto">
-        <div className="container py-6">
+        <div className="container py-8 px-8">
           {children}
         </div>
       </main>

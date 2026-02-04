@@ -318,14 +318,14 @@ function BotsContent() {
   const existingCadences = botSchedules.map(s => s.cadence);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Bot Configuration</h1>
-          <p className="text-muted-foreground">Configure schedules, recipients, and thresholds</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Bot Configuration</h1>
+          <p className="text-muted-foreground text-sm mt-1">Configure schedules, recipients, and thresholds</p>
         </div>
         {selectedCompany && (
-          <Badge variant="outline" className="text-sm">
+          <Badge variant="outline" className="text-sm rounded-full">
             {selectedCompany.name}
           </Badge>
         )}

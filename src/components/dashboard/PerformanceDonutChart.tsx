@@ -55,14 +55,14 @@ export function PerformanceDonutChart({
   }
 
   return (
-    <Card className={cn('animate-fade-in', className)}>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+    <div className={cn('rounded-2xl border border-border/50 bg-card animate-fade-in', className)}>
+      <div className="p-5 pb-3">
+        <h3 className="flex items-center gap-2 text-base font-semibold">
           <Target className="h-4 w-4" />
           {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h3>
+      </div>
+      <div className="px-5 pb-5">
         <div className="h-[200px] relative animate-scale-in">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -82,9 +82,10 @@ export function PerformanceDonutChart({
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                  fontSize: '12px'
+                  border: '1px solid hsl(var(--border) / 0.5)',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
               />
               <Legend 
@@ -95,12 +96,12 @@ export function PerformanceDonutChart({
           </ResponsiveContainer>
           {centerLabel && centerValue && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-20px' }}>
-              <span className="text-2xl font-bold">{centerValue}</span>
+              <span className="text-2xl font-semibold">{centerValue}</span>
               <span className="text-xs text-muted-foreground">{centerLabel}</span>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
