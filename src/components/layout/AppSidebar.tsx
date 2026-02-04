@@ -105,32 +105,39 @@ export function AppSidebar() {
       )}
     >
       {/* Header */}
-      <div className={cn(
-        "flex h-14 items-center gap-3 px-3 border-b border-sidebar-border/30",
-        isCollapsed && "justify-center px-2"
-      )}>
-        <div className={cn(
-          "flex items-center justify-center rounded-xl bg-sidebar-primary transition-all duration-200",
-          isCollapsed ? "h-9 w-9" : "h-8 w-8"
-        )}>
-          <Bot className={cn("text-sidebar-primary-foreground", isCollapsed ? "h-5 w-5" : "h-4 w-4")} />
-        </div>
-        {!isCollapsed && (
-          <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-sm text-sidebar-foreground truncate">Bot Platform</h1>
+      <div className="flex h-14 items-center justify-center px-2 border-b border-sidebar-border/30">
+        {isCollapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-xl transition-all duration-200"
+                onClick={toggleSidebar}
+              >
+                <PanelLeft className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Expand sidebar</TooltipContent>
+          </Tooltip>
+        ) : (
+          <div className="flex w-full items-center gap-3 px-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sidebar-primary">
+              <Bot className="h-4 w-4 text-sidebar-primary-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-semibold text-sm text-sidebar-foreground truncate">Bot Platform</h1>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg transition-all duration-200"
+              onClick={toggleSidebar}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg transition-all duration-200",
-            isCollapsed && "absolute right-2 top-3"
-          )}
-          onClick={toggleSidebar}
-        >
-          {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </Button>
       </div>
 
       {/* Company Selector */}
