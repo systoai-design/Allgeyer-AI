@@ -41,23 +41,27 @@ const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[
   unique_painting: {
     integration_type: 'jobber',
     kpi_names: [
-      'Open Requests',
-      'Approved Quotes',
-      'Active Jobs',
-      'Pending Invoices',
-      'Total Receivables',
+      'New Leads',
+      'New Requests',
+      'Converted Quotes',
       'Quote Value',
+      'New Jobs',
+      'Invoiced Value',
+      'Total Receivables',
+      'Avg Job Value',
     ],
   },
   ati_security: {
     integration_type: 'jobber',
     kpi_names: [
-      'Open Requests',
-      'Approved Quotes',
-      'Active Jobs',
-      'Pending Invoices',
-      'Total Receivables',
+      'New Leads',
+      'New Requests',
+      'Converted Quotes',
       'Quote Value',
+      'New Jobs',
+      'Invoiced Value',
+      'Total Receivables',
+      'Avg Job Value',
     ],
   },
 };
@@ -321,10 +325,16 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
   const kpis: Record<string, number> = {};
   let currentToken = accessToken;
 
-  // Query for requests count - just get totalCount and basic info
+  // Build date filter for createdAt - Jobber uses ISO 8601 format
+  const startDate = `${periodStart}T00:00:00Z`;
+  const endDate = `${periodEnd}T23:59:59Z`;
+  
+  console.log(`Fetching Jobber data for date range: ${startDate} to ${endDate}`);
+
+  // Query for requests with date filter
   const requestsQuery = `
-    query GetRequests {
-      requests(first: 100) {
+    query GetRequests($after: ISO8601DateTime!, $before: ISO8601DateTime!) {
+      requests(filter: { createdAt: { after: $after, before: $before } }, first: 250) {
         nodes {
           id
           createdAt
@@ -332,15 +342,26 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
         }
         totalCount
       }
-    `;
+    }
+  `;
 
-  // Query for quotes
+  // Query for leads with date filter (new leads in the period)
+  const leadsQuery = `
+    query GetLeads($after: ISO8601DateTime!, $before: ISO8601DateTime!) {
+      clients(filter: { createdAt: { after: $after, before: $before } }, first: 250) {
+        totalCount
+      }
+    }
+  `;
+
+  // Query for quotes with date filter
   const quotesQuery = `
-    query GetQuotes {
-      quotes(first: 100) {
+    query GetQuotes($after: ISO8601DateTime!, $before: ISO8601DateTime!) {
+      quotes(filter: { createdAt: { after: $after, before: $before } }, first: 250) {
         nodes {
           id
           quoteStatus
+          createdAt
           amounts {
             total
           }
@@ -350,13 +371,14 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
     }
   `;
 
-  // Query for jobs
+  // Query for jobs with date filter
   const jobsQuery = `
-    query GetJobs {
-      jobs(first: 100) {
+    query GetJobs($after: ISO8601DateTime!, $before: ISO8601DateTime!) {
+      jobs(filter: { createdAt: { after: $after, before: $before } }, first: 250) {
         nodes {
           id
           jobStatus
+          createdAt
           total
         }
         totalCount
@@ -364,13 +386,14 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
     }
   `;
 
-  // Query for invoices - use correct InvoiceAmounts fields
+  // Query for invoices with date filter
   const invoicesQuery = `
-    query GetInvoices {
-      invoices(first: 100) {
+    query GetInvoices($after: ISO8601DateTime!, $before: ISO8601DateTime!) {
+      invoices(filter: { createdAt: { after: $after, before: $before } }, first: 250) {
         nodes {
           id
           invoiceStatus
+          createdAt
           amounts {
             total
             depositAmount
@@ -381,10 +404,12 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
       }
     }
   `;
+  
+  const dateVariables = { after: startDate, before: endDate };
 
   try {
-    // Fetch requests - check for token expiration on first call
-    let requestsResponse = await makeJobberRequest(currentToken, requestsQuery);
+    // Fetch requests with date filter - check for token expiration on first call
+    let requestsResponse = await makeJobberRequest(currentToken, requestsQuery, dateVariables);
     console.log('Requests response:', JSON.stringify(requestsResponse));
     
     // If token expired during request, try to refresh and retry
@@ -393,53 +418,77 @@ async function fetchJobberKPIs(accessToken: string, periodStart: string, periodE
       const newToken = await onTokenExpired();
       if (newToken) {
         currentToken = newToken;
-        requestsResponse = await makeJobberRequest(currentToken, requestsQuery);
+        requestsResponse = await makeJobberRequest(currentToken, requestsQuery, dateVariables);
       }
     }
     
     if (requestsResponse?.data?.requests) {
       const totalCount = requestsResponse.data.requests.totalCount || 0;
       const requests = requestsResponse.data.requests.nodes || [];
-      console.log(`Found ${totalCount} total requests, ${requests.length} in response`);
-      kpis['Open Requests'] = totalCount;
+      console.log(`Found ${totalCount} requests in date range, ${requests.length} in response`);
+      kpis['New Requests'] = totalCount;
     } else {
-      kpis['Open Requests'] = 0;
+      kpis['New Requests'] = 0;
     }
 
-    // Fetch quotes
-    const quotesResponse = await makeJobberRequest(currentToken, quotesQuery);
+    // Fetch leads (new clients) with date filter
+    const leadsResponse = await makeJobberRequest(currentToken, leadsQuery, dateVariables);
+    console.log('Leads response:', JSON.stringify(leadsResponse));
+    if (leadsResponse?.data?.clients) {
+      kpis['New Leads'] = leadsResponse.data.clients.totalCount || 0;
+    } else {
+      kpis['New Leads'] = 0;
+    }
+
+    // Fetch quotes with date filter
+    const quotesResponse = await makeJobberRequest(currentToken, quotesQuery, dateVariables);
+    console.log('Quotes response totalCount:', quotesResponse?.data?.quotes?.totalCount);
     if (quotesResponse?.data?.quotes) {
       const quotes = quotesResponse.data.quotes.nodes || [];
-      const approvedQuotes = quotes.filter((q: any) => q.quoteStatus === 'APPROVED');
-      kpis['Approved Quotes'] = approvedQuotes.length;
       
-      // Calculate total quote value
+      // Converted/Approved quotes
+      const convertedQuotes = quotes.filter((q: any) => 
+        q.quoteStatus === 'APPROVED' || q.quoteStatus === 'CONVERTED'
+      );
+      kpis['Converted Quotes'] = convertedQuotes.length;
+      
+      // Calculate total quote value (sent quotes)
       const totalQuoteValue = quotes.reduce((sum: number, q: any) => {
         return sum + (q.amounts?.total || 0);
       }, 0);
       kpis['Quote Value'] = Math.round(totalQuoteValue * 100) / 100;
+      
+      // Total quotes count
+      kpis['Total Quotes'] = quotes.length;
     }
 
-    // Fetch jobs
-    const jobsResponse = await makeJobberRequest(currentToken, jobsQuery);
+    // Fetch jobs with date filter
+    const jobsResponse = await makeJobberRequest(currentToken, jobsQuery, dateVariables);
+    console.log('Jobs response totalCount:', jobsResponse?.data?.jobs?.totalCount);
     if (jobsResponse?.data?.jobs) {
       const jobs = jobsResponse.data.jobs.nodes || [];
-      const activeJobs = jobs.filter((j: any) => 
-        j.jobStatus === 'ACTIVE' || j.jobStatus === 'IN_PROGRESS' || j.jobStatus === 'TODAY' || j.jobStatus === 'REQUIRES_INVOICING'
-      );
-      kpis['Active Jobs'] = activeJobs.length;
+      kpis['New Jobs'] = jobs.length;
+      
+      // Calculate average job value
+      if (jobs.length > 0) {
+        const totalJobValue = jobs.reduce((sum: number, j: any) => sum + (j.total || 0), 0);
+        kpis['Avg Job Value'] = Math.round((totalJobValue / jobs.length) * 100) / 100;
+      }
     }
 
-    // Fetch invoices
-    const invoicesResponse = await makeJobberRequest(currentToken, invoicesQuery);
+    // Fetch invoices with date filter
+    const invoicesResponse = await makeJobberRequest(currentToken, invoicesQuery, dateVariables);
+    console.log('Invoices response totalCount:', invoicesResponse?.data?.invoices?.totalCount);
     if (invoicesResponse?.data?.invoices) {
       const invoices = invoicesResponse.data.invoices.nodes || [];
-      const pendingInvoices = invoices.filter((i: any) => 
-        i.invoiceStatus === 'DRAFT' || i.invoiceStatus === 'AWAITING_PAYMENT'
-      );
-      kpis['Pending Invoices'] = pendingInvoices.length;
       
-      // Calculate total receivables using invoiceBalance
+      // Calculate invoiced value (total of all invoices in period)
+      const invoicedValue = invoices.reduce((sum: number, i: any) => {
+        return sum + (i.amounts?.total || 0);
+      }, 0);
+      kpis['Invoiced Value'] = Math.round(invoicedValue * 100) / 100;
+      
+      // Calculate total receivables (outstanding balance)
       const totalReceivables = invoices.reduce((sum: number, i: any) => {
         return sum + (i.amounts?.invoiceBalance || 0);
       }, 0);
