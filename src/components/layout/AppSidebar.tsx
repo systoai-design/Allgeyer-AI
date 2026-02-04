@@ -12,8 +12,11 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeft,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from 'next-themes';
 import {
   Select,
   SelectContent,
@@ -90,6 +93,7 @@ export function AppSidebar() {
   const { profile, signOut, isSuperAdmin } = useAuth();
   const { selectedCompany, setSelectedCompany, availableCompanies } = useCompanySelector();
   const { isCollapsed, toggleSidebar } = useSidebarState();
+  const { theme, setTheme } = useTheme();
 
   const initials = profile?.full_name
     ?.split(' ')
@@ -246,6 +250,19 @@ export function AppSidebar() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg"
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                >
+                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg"
                   onClick={() => signOut()}
                 >
                   <LogOut className="h-4 w-4" />
@@ -255,27 +272,37 @@ export function AppSidebar() {
             </Tooltip>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-sidebar-accent/30">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-sidebar-foreground">
-                {profile?.full_name || 'User'}
-              </p>
-              <p className="truncate text-xs text-sidebar-foreground/40">
-                {profile?.email}
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-sidebar-accent/30">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium text-sidebar-foreground">
+                  {profile?.full_name || 'User'}
+                </p>
+                <p className="truncate text-xs text-sidebar-foreground/40">
+                  {profile?.email}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg"
+                onClick={() => signOut()}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </Button>
             </div>
             <Button
               variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg"
-              onClick={() => signOut()}
+              className="w-full justify-start gap-2 h-8 px-3 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded-lg text-sm"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
-              <LogOut className="h-3.5 w-3.5" />
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
             </Button>
           </div>
         )}
