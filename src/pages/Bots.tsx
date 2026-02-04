@@ -124,7 +124,8 @@ function BotsContent() {
   }) => {
     if (!selectedBot || !selectedCompany) return;
 
-    if (editingSchedule) {
+    // Check if we have a valid schedule ID to update (not just a truthy object)
+    if (editingSchedule?.id) {
       const { error } = await supabase
         .from('bot_schedules')
         .update({
