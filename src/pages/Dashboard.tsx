@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2, LinkIcon, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
 import {
@@ -201,11 +202,36 @@ function DashboardContent() {
     ];
   }, [kpiHistory, selectedCadence]);
 
-  // Early returns AFTER all hooks
+  // Early returns AFTER all hooks - Show skeleton loading instead of spinner
   if (authLoading || companyLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6 animate-fade-in">
+        {/* Header Skeleton */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <div className="h-9 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-5 w-64 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-24 bg-muted animate-pulse rounded-lg" />
+            <div className="h-10 w-24 bg-muted animate-pulse rounded-lg" />
+          </div>
+        </div>
+        {/* Tabs Skeleton */}
+        <div className="h-12 w-80 bg-muted animate-pulse rounded-lg" />
+        {/* KPI Cards Skeleton */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-lg border bg-card p-6 space-y-3">
+              <div className="flex justify-between">
+                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-8 w-8 bg-muted animate-pulse rounded-lg" />
+              </div>
+              <div className="h-8 w-20 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -239,7 +265,7 @@ function DashboardContent() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -248,7 +274,7 @@ function DashboardContent() {
             {selectedCompany ? (
               <span className="flex items-center gap-2">
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5 rounded-full transition-colors"
                   style={{ backgroundColor: companyColor }}
                 />
                 {selectedCompany.name} — Performance Overview
@@ -259,12 +285,16 @@ function DashboardContent() {
         
         {/* Quick Stats */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+          <div className={cn(
+            'flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-all duration-200',
+            'hover:shadow-sm hover:border-border',
+            quickStats.openExceptions > 0 && 'border-warning/30 pulse-alert'
+          )}>
             <AlertTriangle className="h-4 w-4 text-warning" />
             <span className="text-sm font-medium">{quickStats.openExceptions}</span>
             <span className="text-xs text-muted-foreground">Open</span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-all duration-200 hover:shadow-sm hover:border-border">
             <Mail className="h-4 w-4 text-accent" />
             <span className="text-sm font-medium">{quickStats.emailsSent}</span>
             <span className="text-xs text-muted-foreground">Emails</span>
@@ -280,20 +310,20 @@ function DashboardContent() {
               <TabsTrigger 
                 key={tab.value} 
                 value={tab.value}
-                className="px-4 py-2 data-[state=active]:shadow-sm"
+                className="px-4 py-2 transition-all duration-200 data-[state=active]:shadow-sm"
               >
                 {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
-          <Button variant="outline" size="sm" onClick={handleExportKPIs}>
+          <Button variant="outline" size="sm" onClick={handleExportKPIs} className="transition-all duration-200 hover:shadow-sm">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
         </div>
 
         {cadenceTabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6">
+        <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6 animate-fade-in">
             {/* Financial Control KPIs (Universal - ALL companies) - Live Data from QBO */}
             <section>
               <div className="mb-4 flex items-center justify-between">
@@ -312,7 +342,7 @@ function DashboardContent() {
                   <LinkIcon className="h-3 w-3 mr-1" /> QBO Connected
                 </Badge>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 stagger-children">
                 {financialControlKpis[tab.value]?.slice(0, 4).map((kpi) => {
                   const liveKpi = kpiHistory.find(
                     k => k.kpi_name === kpi.label && k.cadence === tab.value
@@ -369,7 +399,7 @@ function DashboardContent() {
                   <AlertCircle className="h-3 w-3 mr-1" /> Integration Required
                 </Badge>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
                 {companyKpis[tab.value]?.map((kpi) => {
                   const liveKpi = kpiHistory.find(
                     k => k.kpi_name === kpi.label && k.cadence === tab.value

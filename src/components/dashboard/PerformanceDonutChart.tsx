@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Target } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PerformanceDonutChartProps {
   title?: string;
@@ -19,6 +20,7 @@ interface PerformanceDonutChartProps {
   centerLabel?: string;
   centerValue?: string | number;
   className?: string;
+  isLoading?: boolean;
 }
 
 export function PerformanceDonutChart({ 
@@ -26,10 +28,34 @@ export function PerformanceDonutChart({
   data, 
   centerLabel,
   centerValue,
-  className 
+  className,
+  isLoading 
 }: PerformanceDonutChartProps) {
+  if (isLoading) {
+    return (
+      <Card className={cn('animate-fade-in', className)}>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Target className="h-4 w-4" />
+            {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px] flex items-center justify-center">
+            <div className="relative">
+              <div className="h-32 w-32 rounded-full border-8 border-muted animate-pulse" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-20 w-20 rounded-full bg-card" />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className={className}>
+    <Card className={cn('animate-fade-in', className)}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Target className="h-4 w-4" />
@@ -37,7 +63,7 @@ export function PerformanceDonutChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] relative">
+        <div className="h-[200px] relative animate-scale-in">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

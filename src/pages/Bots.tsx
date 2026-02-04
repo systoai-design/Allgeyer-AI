@@ -318,7 +318,7 @@ function BotsContent() {
   const existingCadences = botSchedules.map(s => s.cadence);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Bot Configuration</h1>

@@ -192,7 +192,7 @@ function BotRunsContent() {
   const getLastRun = (botId: string) => runs.find(r => r.bot_id === botId);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Bot Runs</h1>
         <p className="text-muted-foreground">Manage automation bots and view execution history</p>
