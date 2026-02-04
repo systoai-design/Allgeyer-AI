@@ -58,11 +58,21 @@ function DashboardContent() {
   // Track which integrations are connected
   const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
 
+  // Track previous date range to detect changes
+  const [previousDateRange, setPreviousDateRange] = useState<DateRange | undefined>(undefined);
+  const [hasAutoSynced, setHasAutoSynced] = useState<Set<string>>(new Set());
+
+  // Generate a unique key for a date range
+  const getDateRangeKey = (range: DateRange | undefined) => {
+    if (!range?.from || !range?.to) return '';
+    return `${format(range.from, 'yyyy-MM-dd')}_${format(range.to, 'yyyy-MM-dd')}`;
+  };
+
   // Fetch data function - extracted for reuse
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (skipLoadingState = false) => {
     if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
     
-    setIsLoading(true);
+    if (!skipLoadingState) setIsLoading(true);
     
     const startDate = format(dateRange.from, 'yyyy-MM-dd');
     const endDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -138,24 +148,21 @@ function DashboardContent() {
         .limit(500);
       if (kpiData) setKpiHistory(kpiData as KpiHistory[]);
 
+      return kpiData;
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      return null;
     } finally {
-      setIsLoading(false);
+      if (!skipLoadingState) setIsLoading(false);
     }
   }, [selectedCompany, dateRange]);
 
-  // Fetch data when company or date range changes
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Sync data handler - runs both Financial Control and CRM bots
-  const handleSyncData = async () => {
-    if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
+  // Core sync logic - extracted for reuse
+  const performSync = useCallback(async (showToast = true) => {
+    if (!selectedCompany || !dateRange?.from || !dateRange?.to) return false;
     
     setIsSyncing(true);
-    toast.info('Starting data sync...', { id: 'sync-toast' });
+    if (showToast) toast.info('Syncing data for selected period...', { id: 'sync-toast' });
 
     try {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
@@ -175,7 +182,7 @@ function DashboardContent() {
       const crmBot = botsData.find(b => b.bot_type === selectedCompany.company_type);
 
       // Create bot run records
-      const botRuns: { id: string; bot_type: string }[] = [];
+      const botRunsToCreate: { id: string; bot_type: string }[] = [];
 
       if (financialBot) {
         const { data: fcRun } = await supabase
@@ -188,7 +195,7 @@ function DashboardContent() {
           })
           .select('id')
           .single();
-        if (fcRun) botRuns.push({ id: fcRun.id, bot_type: 'financial_control' });
+        if (fcRun) botRunsToCreate.push({ id: fcRun.id, bot_type: 'financial_control' });
       }
 
       if (crmBot) {
@@ -202,11 +209,11 @@ function DashboardContent() {
           })
           .select('id')
           .single();
-        if (crmRun) botRuns.push({ id: crmRun.id, bot_type: selectedCompany.company_type });
+        if (crmRun) botRunsToCreate.push({ id: crmRun.id, bot_type: selectedCompany.company_type });
       }
 
       // Call edge functions in parallel
-      const promises = botRuns.map(async (run) => {
+      const promises = botRunsToCreate.map(async (run) => {
         if (run.bot_type === 'financial_control') {
           return supabase.functions.invoke('run-financial-control-bot', {
             body: {
@@ -233,17 +240,64 @@ function DashboardContent() {
 
       await Promise.all(promises);
 
-      toast.success('Data synced successfully!', { id: 'sync-toast' });
+      if (showToast) toast.success('Data synced successfully!', { id: 'sync-toast' });
       
       // Refresh dashboard data
       await fetchData();
+      return true;
 
     } catch (error) {
       console.error('Sync error:', error);
-      toast.error('Sync failed. Please try again.', { id: 'sync-toast' });
+      if (showToast) toast.error('Sync failed. Please try again.', { id: 'sync-toast' });
+      return false;
     } finally {
       setIsSyncing(false);
     }
+  }, [selectedCompany, dateRange, fetchData]);
+
+  // Auto-sync when date range changes and no data exists
+  const autoSyncIfNeeded = useCallback(async () => {
+    if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
+    if (isSyncing) return;
+    
+    const rangeKey = `${selectedCompany.id}_${getDateRangeKey(dateRange)}`;
+    
+    // Don't auto-sync if we've already done it for this range
+    if (hasAutoSynced.has(rangeKey)) return;
+    
+    // Fetch data first to see if we have any
+    const kpiData = await fetchData();
+    
+    // If no KPI data exists for this range, trigger auto-sync
+    if (!kpiData || kpiData.length === 0) {
+      console.log('No data for range, auto-syncing...');
+      setHasAutoSynced(prev => new Set([...prev, rangeKey]));
+      await performSync(true);
+    }
+  }, [selectedCompany, dateRange, isSyncing, hasAutoSynced, fetchData, performSync]);
+
+  // Detect date range changes and trigger auto-sync
+  useEffect(() => {
+    const currentKey = getDateRangeKey(dateRange);
+    const previousKey = getDateRangeKey(previousDateRange);
+    
+    if (currentKey !== previousKey && currentKey) {
+      setPreviousDateRange(dateRange);
+      autoSyncIfNeeded();
+    }
+  }, [dateRange, previousDateRange, autoSyncIfNeeded]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    if (selectedCompany && dateRange?.from && dateRange?.to && !previousDateRange) {
+      setPreviousDateRange(dateRange);
+      autoSyncIfNeeded();
+    }
+  }, [selectedCompany, dateRange, previousDateRange, autoSyncIfNeeded]);
+
+  // Manual sync data handler
+  const handleSyncData = () => {
+    performSync(true);
   };
 
   // Check if company-specific CRM is connected
