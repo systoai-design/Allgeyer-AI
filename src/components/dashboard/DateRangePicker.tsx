@@ -182,14 +182,14 @@ export function DateRangePicker({
         <PopoverContent className="w-auto p-0" align="end">
           <div className="flex">
             {/* Presets sidebar */}
-            <div className="border-r p-3 space-y-1 min-w-[140px]">
-              <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
+            <div className="border-r p-2 space-y-0.5 min-w-[110px]">
+              <p className="text-[10px] font-medium text-muted-foreground mb-1.5 px-1.5">Quick Select</p>
               {dateRangePresets.map((preset) => (
                 <button
                   key={preset.value}
                   onClick={() => handlePresetClick(preset)}
                   className={cn(
-                    "w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors",
+                    "w-full text-left px-1.5 py-1 text-xs rounded transition-colors",
                     selectedPreset === preset.value
                       ? "bg-accent text-accent-foreground"
                       : "hover:bg-muted"
@@ -200,16 +200,16 @@ export function DateRangePicker({
               ))}
             </div>
             {/* Calendar */}
-            <div className="p-3">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Custom Range</p>
+            <div className="p-2">
+              <p className="text-[10px] font-medium text-muted-foreground mb-1.5">Custom Range</p>
               <Calendar
                 initialFocus
                 mode="range"
                 defaultMonth={dateRange?.from}
                 selected={dateRange}
                 onSelect={handleCustomRange}
-                numberOfMonths={2}
-                className="pointer-events-auto"
+                numberOfMonths={1}
+                className="pointer-events-auto text-xs"
               />
             </div>
           </div>
