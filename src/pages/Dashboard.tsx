@@ -488,7 +488,7 @@ function DashboardContent() {
             <div>
               <h2 className="text-base font-semibold text-foreground">Financial KPIs</h2>
               <p className="text-sm text-muted-foreground">
-                Universal metrics from QuickBooks (all companies)
+                {selectedCompany?.name ? `${selectedCompany.name} financials from QuickBooks` : 'Metrics from QuickBooks'}
               </p>
             </div>
           </div>
