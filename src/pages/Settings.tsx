@@ -20,6 +20,7 @@ function SettingsContent() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(true);
   const [connectingQBO, setConnectingQBO] = useState(false);
   const [connectingJobber, setConnectingJobber] = useState(false);
+  const [syncingJobber, setSyncingJobber] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -217,6 +218,96 @@ function SettingsContent() {
     }
   };
 
+  const handleSyncJobber = async () => {
+    if (!selectedCompany) {
+      toast.error('Please select a company first');
+      return;
+    }
+
+    setSyncingJobber(true);
+    try {
+      // Test the connection by fetching some data from Jobber
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/jobber-api`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            company_id: selectedCompany.id,
+            query: `
+              query {
+                account {
+                  id
+                  name
+                }
+                clients(first: 5) {
+                  nodes {
+                    id
+                    firstName
+                    lastName
+                    companyName
+                  }
+                  totalCount
+                }
+                jobs(first: 5) {
+                  nodes {
+                    id
+                    title
+                    jobNumber
+                    jobStatus
+                  }
+                  totalCount
+                }
+              }
+            `,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Update the last_sync_at timestamp
+      const { error: updateError } = await supabase
+        .from('integrations')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('company_id', selectedCompany.id)
+        .eq('integration_type', 'jobber');
+
+      if (updateError) {
+        console.error('Error updating sync timestamp:', updateError);
+      }
+
+      // Refresh integrations to show new sync time
+      const { data: updatedIntegrations } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('company_id', selectedCompany.id);
+
+      if (updatedIntegrations) {
+        setIntegrations(updatedIntegrations as Integration[]);
+      }
+
+      const accountName = result.data?.account?.name || 'Unknown';
+      const clientCount = result.data?.clients?.totalCount || 0;
+      const jobCount = result.data?.jobs?.totalCount || 0;
+
+      toast.success(
+        `Jobber sync successful! Account: ${accountName}, ${clientCount} clients, ${jobCount} jobs`
+      );
+    } catch (error) {
+      console.error('Error syncing Jobber:', error);
+      toast.error(`Failed to sync with Jobber: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSyncingJobber(false);
+    }
+  };
+
   const qboIntegration = integrations.find(i => i.integration_type === 'quickbooks');
   const isQBOConnected = qboIntegration?.is_connected;
   
@@ -401,15 +492,26 @@ function SettingsContent() {
                   <Button
                     variant="outline"
                     className="flex-1 rounded-full"
-                    onClick={() => toast.info('Jobber sync functionality coming soon')}
+                    onClick={handleSyncJobber}
+                    disabled={syncingJobber}
                   >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Sync Now
+                    {syncingJobber ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Sync Now
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="destructive"
                     className="rounded-full"
                     onClick={() => jobberIntegration && handleDisconnectJobber(jobberIntegration.id)}
+                    disabled={syncingJobber}
                   >
                     Disconnect
                   </Button>
