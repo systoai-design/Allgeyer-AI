@@ -265,16 +265,16 @@ function DashboardContent() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             {selectedCompany ? (
               <span className="flex items-center gap-2">
                 <span
-                  className="h-2.5 w-2.5 rounded-full transition-colors"
+                  className="h-2 w-2 rounded-full"
                   style={{ backgroundColor: companyColor }}
                 />
                 {selectedCompany.name} — Performance Overview
@@ -283,18 +283,17 @@ function DashboardContent() {
           </p>
         </div>
         
-        {/* Quick Stats */}
-        <div className="flex items-center gap-3">
+        {/* Quick Stats - Pill shaped */}
+        <div className="flex items-center gap-2">
           <div className={cn(
-            'flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-all duration-200',
-            'hover:shadow-sm hover:border-border',
-            quickStats.openExceptions > 0 && 'border-warning/30 pulse-alert'
+            'flex items-center gap-2 rounded-full bg-card border border-border/50 px-4 py-2 transition-all duration-200',
+            quickStats.openExceptions > 0 && 'border-warning/40 pulse-alert'
           )}>
             <AlertTriangle className="h-4 w-4 text-warning" />
             <span className="text-sm font-medium">{quickStats.openExceptions}</span>
             <span className="text-xs text-muted-foreground">Open</span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-all duration-200 hover:shadow-sm hover:border-border">
+          <div className="flex items-center gap-2 rounded-full bg-card border border-border/50 px-4 py-2">
             <Mail className="h-4 w-4 text-accent" />
             <span className="text-sm font-medium">{quickStats.emailsSent}</span>
             <span className="text-xs text-muted-foreground">Emails</span>
@@ -302,168 +301,163 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Cadence Tabs */}
-      <Tabs value={selectedCadence} onValueChange={(v) => setSelectedCadence(v as CadenceType)}>
-        <div className="flex items-center justify-between gap-4">
-          <TabsList className="h-auto p-1">
-            {cadenceTabs.map((tab) => (
-              <TabsTrigger 
-                key={tab.value} 
-                value={tab.value}
-                className="px-4 py-2 transition-all duration-200 data-[state=active]:shadow-sm"
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <Button variant="outline" size="sm" onClick={handleExportKPIs} className="transition-all duration-200 hover:shadow-sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+      {/* Cadence Tabs - Pill style */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex gap-2">
+          {cadenceTabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setSelectedCadence(tab.value)}
+              className={cn(
+                'px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
+                selectedCadence === tab.value
+                  ? 'bg-foreground text-background shadow-sm'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+        <Button variant="outline" size="sm" onClick={handleExportKPIs} className="rounded-full transition-all duration-200">
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
+      </div>
 
-        {cadenceTabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="mt-6 space-y-6 animate-fade-in">
-            {/* Financial Control KPIs (Universal - ALL companies) - Live Data from QBO */}
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-chart-4/10">
-                    <BarChart3 className="h-5 w-5 text-chart-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">Financial KPIs</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Universal metrics from QuickBooks (all companies)
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
-                  <LinkIcon className="h-3 w-3 mr-1" /> QBO Connected
-                </Badge>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 stagger-children">
-                {financialControlKpis[tab.value]?.slice(0, 4).map((kpi) => {
-                  const liveKpi = kpiHistory.find(
-                    k => k.kpi_name === kpi.label && k.cadence === tab.value
-                  );
-                  const kpiValue = liveKpi ? {
-                    value: liveKpi.kpi_value ?? 0,
-                    trend: 0,
-                    status: liveKpi.kpi_status || 'on_track'
-                  } : null;
-                  
-                  return (
-                    <KpiCard
-                      key={kpi.key}
-                      title={kpi.label}
-                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
-                      icon={kpi.icon}
-                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
-                      className="border-chart-4/20"
-                    />
-                  );
-                })}
-              </div>
-              {kpiHistory.filter(k => k.cadence === tab.value && ['Sales Revenue', 'Gross Profit', 'Net Profit', 'Net Cash Flow'].includes(k.kpi_name)).length === 0 && (
-                <p className="mt-4 text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg bg-muted/30">
-                  <AlertCircle className="h-4 w-4 inline mr-2" />
-                  Run the Financial Control bot to generate live KPI data from QuickBooks.
-                </p>
-              )}
-            </section>
-
-            {/* Company-Specific KPIs - From CRM */}
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="flex h-9 w-9 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: `${companyColor}20` }}
-                  >
-                    <Building2 className="h-5 w-5" style={{ color: companyColor }} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">
-                      {selectedCompany?.name} KPIs
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
-                       selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
-                       'Project tracking from Jobber'}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
-                  <AlertCircle className="h-3 w-3 mr-1" /> Integration Required
-                </Badge>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
-                {companyKpis[tab.value]?.map((kpi) => {
-                  const liveKpi = kpiHistory.find(
-                    k => k.kpi_name === kpi.label && k.cadence === tab.value
-                  );
-                  const kpiValue = liveKpi ? {
-                    value: liveKpi.kpi_value ?? 0,
-                    trend: 0,
-                    status: liveKpi.kpi_status || 'on_track'
-                  } : null;
-                  return (
-                    <KpiCard
-                      key={kpi.key}
-                      title={kpi.label}
-                      value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
-                      icon={kpi.icon}
-                      status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
-                      trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
-                    />
-                  );
-                })}
-              </div>
-              {companyKpis[tab.value]?.length > 0 && !kpiHistory.some(k => k.cadence === tab.value && companyKpis[tab.value]?.some(kpi => kpi.label === k.kpi_name)) && (
-                <Card className="mt-4 border-dashed bg-muted/30">
-                  <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-                    <AlertCircle className="h-8 w-8 text-amber-500 mb-3" />
-                    <h3 className="font-medium text-foreground mb-1">CRM Integration Required</h3>
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      Connect {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : 
-                               selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} to see 
-                      {selectedCompany?.company_type === 'property_halo' ? ' Asset Summary (Bought, Sold, Under Contract, Upcoming Closings)' : ' completed jobs and operational metrics'}.
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate('/settings')}>
-                      Configure Integration
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </section>
-
-            {/* Charts Section */}
-            <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <KpiTrendChart
-                title="Performance Trends"
-                data={trendChartData}
-                lines={[
-                  { key: 'Leads', name: 'Leads', color: companyColor },
-                  { key: 'Conversions', name: 'Conversions', color: 'hsl(var(--chart-2))' },
-                ]}
+      {/* Financial Control KPIs (Universal - ALL companies) - Live Data from QBO */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-chart-4/10">
+              <BarChart3 className="h-5 w-5 text-chart-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Financial KPIs</h2>
+              <p className="text-sm text-muted-foreground">
+                Universal metrics from QuickBooks (all companies)
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">
+            <LinkIcon className="h-3 w-3 mr-1" /> QBO Connected
+          </Badge>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 stagger-children">
+          {financialControlKpis[selectedCadence]?.slice(0, 4).map((kpi) => {
+            const liveKpi = kpiHistory.find(
+              k => k.kpi_name === kpi.label && k.cadence === selectedCadence
+            );
+            const kpiValue = liveKpi ? {
+              value: liveKpi.kpi_value ?? 0,
+              trend: 0,
+              status: liveKpi.kpi_status || 'on_track'
+            } : null;
+            
+            return (
+              <KpiCard
+                key={kpi.key}
+                title={kpi.label}
+                value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                icon={kpi.icon}
+                status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
               />
-              <ExceptionBarChart
-                title="Exceptions by Severity"
-                data={exceptionChartData}
-              />
-              <PerformanceDonutChart
-                title="KPI Status"
-                data={kpiStatusData}
-                centerLabel="KPIs"
-                centerValue={currentKpis.length}
-              />
-            </section>
+            );
+          })}
+        </div>
+        {kpiHistory.filter(k => k.cadence === selectedCadence && ['Sales Revenue', 'Gross Profit', 'Net Profit', 'Net Cash Flow'].includes(k.kpi_name)).length === 0 && (
+          <p className="mt-4 text-sm text-muted-foreground text-center py-6 border border-dashed rounded-2xl bg-muted/30">
+            <AlertCircle className="h-4 w-4 inline mr-2" />
+            Run the Financial Control bot to generate live KPI data from QuickBooks.
+          </p>
+        )}
+      </section>
 
-          </TabsContent>
-        ))}
-      </Tabs>
+      {/* Company-Specific KPIs - From CRM */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div 
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{ backgroundColor: `${companyColor}20` }}
+            >
+              <Building2 className="h-5 w-5" style={{ color: companyColor }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                {selectedCompany?.name} KPIs
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
+                 selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
+                 'Project tracking from Jobber'}
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/20">
+            <AlertCircle className="h-3 w-3 mr-1" /> Integration Required
+          </Badge>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
+          {companyKpis[selectedCadence]?.map((kpi) => {
+            const liveKpi = kpiHistory.find(
+              k => k.kpi_name === kpi.label && k.cadence === selectedCadence
+            );
+            const kpiValue = liveKpi ? {
+              value: liveKpi.kpi_value ?? 0,
+              trend: 0,
+              status: liveKpi.kpi_status || 'on_track'
+            } : null;
+            return (
+              <KpiCard
+                key={kpi.key}
+                title={kpi.label}
+                value={kpiValue ? formatKpiValue(kpiValue.value, kpi.format) : '—'}
+                icon={kpi.icon}
+                status={kpiValue?.status as 'on_track' | 'warning' | 'critical' | undefined}
+                trend={kpiValue && kpiValue.trend !== 0 ? { value: kpiValue.trend, label: kpi.trendLabel } : undefined}
+              />
+            );
+          })}
+        </div>
+        {companyKpis[selectedCadence]?.length > 0 && !kpiHistory.some(k => k.cadence === selectedCadence && companyKpis[selectedCadence]?.some(kpi => kpi.label === k.kpi_name)) && (
+          <div className="mt-4 rounded-2xl border border-dashed border-border/50 bg-muted/30 p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-warning mx-auto mb-3" />
+            <h3 className="font-medium text-foreground mb-1">CRM Integration Required</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Connect {selectedCompany?.company_type === 'property_halo' ? 'PETE CRM' : 
+                       selectedCompany?.company_type === 'unique_painting' ? 'Labortech' : 'Jobber'} to see 
+              {selectedCompany?.company_type === 'property_halo' ? ' Asset Summary (Bought, Sold, Under Contract, Upcoming Closings)' : ' completed jobs and operational metrics'}.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => navigate('/settings')}>
+              Configure Integration
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/* Charts Section */}
+      <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <KpiTrendChart
+          title="Performance Trends"
+          data={trendChartData}
+          lines={[
+            { key: 'Leads', name: 'Leads', color: companyColor },
+            { key: 'Conversions', name: 'Conversions', color: 'hsl(var(--chart-2))' },
+          ]}
+        />
+        <ExceptionBarChart
+          title="Exceptions by Severity"
+          data={exceptionChartData}
+        />
+        <PerformanceDonutChart
+          title="KPI Status"
+          data={kpiStatusData}
+          centerLabel="KPIs"
+          centerValue={currentKpis.length}
+        />
+      </section>
 
       {/* Activity Section */}
       <section className="grid gap-6 lg:grid-cols-2">

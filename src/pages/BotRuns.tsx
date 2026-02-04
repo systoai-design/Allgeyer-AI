@@ -192,26 +192,26 @@ function BotRunsContent() {
   const getLastRun = (botId: string) => runs.find(r => r.bot_id === botId);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Bot Runs</h1>
-        <p className="text-muted-foreground">Manage automation bots and view execution history</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Bot Runs</h1>
+        <p className="text-muted-foreground text-sm mt-1">Manage automation bots and view execution history</p>
       </div>
 
       {/* Bot Status Section */}
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10">
+      <div className="rounded-2xl border border-border/50 bg-card">
+        <div className="p-5 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10">
               <Bot className="h-5 w-5 text-accent" />
             </div>
             <div>
-              <CardTitle className="text-lg">Bot Status</CardTitle>
-              <CardDescription>Current state of all automation bots</CardDescription>
+              <h2 className="text-base font-semibold">Bot Status</h2>
+              <p className="text-sm text-muted-foreground">Current state of all automation bots</p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="p-5">
           {/* Filter bots: show Financial Control (universal) + company-specific bot */}
           {(() => {
             const companyBotType = selectedCompany?.company_type; // e.g., 'property_halo'
@@ -287,8 +287,8 @@ function BotRunsContent() {
           </div>
             );
           })()}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">

@@ -152,6 +152,29 @@
 }
 
 @layer utilities {
+  /* Apple-style container */
+  .apple-card {
+    @apply bg-card rounded-2xl border border-border/50 shadow-sm;
+  }
+
+  /* Apple-style input */
+  .apple-input {
+    @apply bg-muted/40 border-0 rounded-xl focus:ring-2 focus:ring-ring/20;
+  }
+
+  /* Apple-style pill button */
+  .apple-pill {
+    @apply px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200;
+  }
+
+  .apple-pill-active {
+    @apply bg-foreground text-background shadow-sm;
+  }
+
+  .apple-pill-inactive {
+    @apply bg-muted/60 text-muted-foreground hover:bg-muted;
+  }
+
   /* KPI status indicators */
   .status-on-track {
     @apply bg-success text-success-foreground;
@@ -217,16 +240,26 @@
   .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
   .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
 
-  /* Interactive card states */
+  /* Interactive card states - Apple style */
   .interactive-card {
     @apply transition-all duration-200 ease-out;
   }
   .interactive-card:hover {
-    @apply shadow-md border-border;
+    @apply shadow-md;
     transform: translateY(-2px);
   }
   .interactive-card:active {
-    transform: translateY(0) scale(0.99);
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Apple-style list row */
+  .apple-list-row {
+    @apply flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200;
+    @apply hover:bg-muted/50 cursor-pointer;
+  }
+
+  .apple-list-row:active {
+    @apply scale-[0.99];
   }
 
   /* Pulse animation for alerts */

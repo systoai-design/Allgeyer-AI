@@ -57,18 +57,18 @@ export function KpiTrendChart({ title = 'KPI Trends', data, lines, className, is
   }
 
   return (
-    <Card className={cn('animate-fade-in', className)}>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+    <div className={cn('rounded-2xl border border-border/50 bg-card animate-fade-in', className)}>
+      <div className="p-5 pb-3">
+        <h3 className="flex items-center gap-2 text-base font-semibold">
           <TrendingUp className="h-4 w-4" />
           {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h3>
+      </div>
+      <div className="px-5 pb-5">
         <div className="h-[250px] animate-scale-in">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
               <XAxis 
                 dataKey="period" 
                 tick={{ fontSize: 12 }}
@@ -85,9 +85,10 @@ export function KpiTrendChart({ title = 'KPI Trends', data, lines, className, is
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                  fontSize: '12px'
+                  border: '1px solid hsl(var(--border) / 0.5)',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -106,7 +107,7 @@ export function KpiTrendChart({ title = 'KPI Trends', data, lines, className, is
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

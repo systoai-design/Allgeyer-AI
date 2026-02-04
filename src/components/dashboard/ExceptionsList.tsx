@@ -68,24 +68,24 @@ export function ExceptionsList({ exceptions, isLoading }: ExceptionsListProps) {
   }
 
   return (
-    <Card className="animate-fade-in">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <div className="rounded-2xl border border-border/50 bg-card animate-fade-in">
+      <div className="flex items-center justify-between p-5 pb-4">
         <div>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-warning" />
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle className="h-4 w-4 text-warning" />
             Recent Exceptions
-          </CardTitle>
-          <CardDescription>Items requiring attention</CardDescription>
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Items requiring attention</p>
         </div>
-        <Button variant="ghost" size="sm" asChild className="transition-colors hover:bg-accent/10">
+        <Button variant="ghost" size="sm" asChild className="rounded-full text-muted-foreground hover:text-foreground">
           <Link to="/exceptions" className="gap-1">
             View all <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="px-2 pb-2">
         {exceptions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center animate-fade-in">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
             <div className="rounded-full bg-success/10 p-3 mb-3">
               <AlertTriangle className="h-6 w-6 text-success" />
             </div>
@@ -93,19 +93,14 @@ export function ExceptionsList({ exceptions, isLoading }: ExceptionsListProps) {
             <p className="text-sm text-muted-foreground">Everything is running smoothly</p>
           </div>
         ) : (
-          <div className="space-y-3 stagger-children">
+          <div className="space-y-1 stagger-children">
             {exceptions.map((exception) => (
               <div
                 key={exception.id}
-                className={cn(
-                  'flex items-start gap-4 rounded-lg border p-3',
-                  'transition-all duration-200 ease-out cursor-pointer',
-                  'hover:bg-muted/50 hover:border-border hover:shadow-sm hover:-translate-y-0.5',
-                  'active:translate-y-0 active:scale-[0.995]'
-                )}
+                className="group flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-muted/50 cursor-pointer"
               >
                 <div className={cn(
-                  'mt-0.5 rounded-full p-1.5 transition-colors',
+                  'rounded-full p-2 shrink-0',
                   exception.severity === 'critical' ? 'bg-destructive/10' :
                   exception.severity === 'high' ? 'bg-orange-100 dark:bg-orange-900/20' :
                   'bg-warning/10'
@@ -118,33 +113,25 @@ export function ExceptionsList({ exceptions, isLoading }: ExceptionsListProps) {
                   )} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium truncate">{exception.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {exception.exception_type}
-                        {exception.bot_name && ` • ${exception.bot_name}`}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className={cn('shrink-0 transition-colors', severityStyles[exception.severity])}>
-                      {exception.severity}
-                    </Badge>
-                  </div>
-                  <div className="mt-2 flex items-center gap-3">
-                    <Badge variant="secondary" className={cn('text-xs transition-colors', statusStyles[exception.status])}>
-                      {exception.status.replace('_', ' ')}
-                    </Badge>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {formatDistanceToNow(new Date(exception.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
+                  <p className="font-medium truncate">{exception.title}</p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {exception.exception_type}
+                    {exception.bot_name && ` • ${exception.bot_name}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className={cn('capitalize text-xs', severityStyles[exception.severity])}>
+                    {exception.severity}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    {formatDistanceToNow(new Date(exception.created_at), { addSuffix: true })}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

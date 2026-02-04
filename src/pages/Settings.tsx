@@ -149,16 +149,16 @@ function SettingsContent() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground">Platform configuration and integrations</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
+        <p className="text-muted-foreground text-sm mt-1">Platform configuration and integrations</p>
       </div>
+      
       {/* Multi-Company Integration Overview (for super admins or users with multiple companies) */}
       {availableCompanies.length > 1 && (
         <CompanyIntegrationStatus
           onSelectCompany={(company) => {
-            // Scroll to QBO card when a company is selected
             const qboCard = document.getElementById('qbo-integration-card');
             if (qboCard) {
               qboCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -170,41 +170,41 @@ function SettingsContent() {
       )}
 
       {/* QuickBooks Integration Card */}
-      <Card id="qbo-integration-card">
-        <CardHeader>
+      <div id="qbo-integration-card" className="rounded-2xl border border-border/50 bg-card">
+        <div className="p-5 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2CA01C]/10">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#2CA01C]/10">
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#2CA01C">
                   <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.4c5.302 0 9.6 4.298 9.6 9.6s-4.298 9.6-9.6 9.6S2.4 17.302 2.4 12 6.698 2.4 12 2.4zm-1.2 4.8c-2.651 0-4.8 2.149-4.8 4.8s2.149 4.8 4.8 4.8v-2.4c-1.325 0-2.4-1.075-2.4-2.4s1.075-2.4 2.4-2.4v-2.4zm2.4 0v2.4c1.325 0 2.4 1.075 2.4 2.4s-1.075 2.4-2.4 2.4v2.4c2.651 0 4.8-2.149 4.8-4.8s-2.149-4.8-4.8-4.8z"/>
                 </svg>
               </div>
               <div>
-                <CardTitle className="text-lg">QuickBooks Online</CardTitle>
-                <CardDescription>Financial data integration</CardDescription>
+                <h2 className="text-base font-semibold">QuickBooks Online</h2>
+                <p className="text-sm text-muted-foreground">Financial data integration</p>
               </div>
             </div>
             {isQBOConnected ? (
-              <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+              <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
                 <CheckCircle2 className="mr-1 h-3 w-3" />
                 Connected
               </Badge>
             ) : (
-              <Badge variant="secondary" className="bg-muted text-muted-foreground">
+              <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
                 <XCircle className="mr-1 h-3 w-3" />
                 Not Connected
               </Badge>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <div className="p-5">
           {selectedCompany ? (
             <>
-              <div className="rounded-lg border bg-muted/50 p-4">
+              <div className="rounded-xl bg-muted/40 p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium">Company</p>
-                    <p className="text-lg font-semibold">{selectedCompany.name}</p>
+                    <p className="text-sm text-muted-foreground">Company</p>
+                    <p className="text-base font-semibold">{selectedCompany.name}</p>
                   </div>
                   {isQBOConnected && qboIntegration?.last_sync_at && (
                     <div className="text-right">
@@ -221,7 +221,7 @@ function SettingsContent() {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 rounded-full"
                     onClick={() => toast.info('Sync functionality coming soon')}
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -229,6 +229,7 @@ function SettingsContent() {
                   </Button>
                   <Button
                     variant="destructive"
+                    className="rounded-full"
                     onClick={() => qboIntegration && handleDisconnectQBO(qboIntegration.id)}
                   >
                     Disconnect
@@ -236,7 +237,7 @@ function SettingsContent() {
                 </div>
               ) : (
                 <Button
-                  className="w-full bg-[#2CA01C] hover:bg-[#248017] text-white"
+                  className="w-full rounded-full bg-[#2CA01C] hover:bg-[#248017] text-white"
                   onClick={handleConnectQBO}
                   disabled={connecting || loadingIntegrations}
                 >
@@ -259,16 +260,16 @@ function SettingsContent() {
               <p>Please select a company from the sidebar to manage integrations.</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Other Integrations Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Other Integrations</CardTitle>
-          <CardDescription>Additional platform connections</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="rounded-2xl border border-border/50 bg-card">
+        <div className="p-5 border-b border-border/50">
+          <h2 className="text-base font-semibold">Other Integrations</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Additional platform connections</p>
+        </div>
+        <div className="p-5">
           <div className="grid gap-4 sm:grid-cols-3">
             {[
               { name: 'PETE CRM', description: 'Real estate lead tracking', company: 'Property Halo' },
@@ -277,46 +278,46 @@ function SettingsContent() {
             ].map((integration) => (
               <div
                 key={integration.name}
-                className="rounded-lg border bg-card p-4 opacity-60"
+                className="rounded-xl border border-border/50 bg-muted/20 p-4 opacity-70"
               >
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium">{integration.name}</h3>
-                  <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                  <Badge variant="outline" className="text-xs rounded-full">Coming Soon</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">{integration.description}</p>
                 <p className="text-xs text-muted-foreground mt-1">For: {integration.company}</p>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Support Contact Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Support</CardTitle>
-          <CardDescription>Get help with the platform</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border/50 bg-card">
+        <div className="p-5 border-b border-border/50">
+          <h2 className="text-base font-semibold">Support</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Get help with the platform</p>
+        </div>
+        <div className="p-5">
+          <p className="text-sm text-muted-foreground mb-4">
             For questions about integrations or platform issues, contact your organization's administrator.
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="rounded-full">
               <a href="/privacy" target="_blank">
                 <ExternalLink className="mr-2 h-3 w-3" />
                 Privacy Policy
               </a>
             </Button>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="rounded-full">
               <a href="/terms" target="_blank">
                 <ExternalLink className="mr-2 h-3 w-3" />
                 Terms of Service
               </a>
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
