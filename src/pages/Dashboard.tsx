@@ -155,7 +155,7 @@ function DashboardContent() {
       case 'property_halo':
         return connectedIntegrations.includes('pete_crm');
       case 'unique_painting':
-        return connectedIntegrations.includes('labortech');
+        return connectedIntegrations.includes('jobber');
       case 'ati_security':
         return connectedIntegrations.includes('jobber');
       default:
