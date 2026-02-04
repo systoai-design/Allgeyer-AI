@@ -194,4 +194,48 @@
   .glass {
     @apply bg-card/80 backdrop-blur-sm;
   }
+
+  /* Animation delay utilities */
+  .delay-75 { animation-delay: 75ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-225 { animation-delay: 225ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-375 { animation-delay: 375ms; }
+  .delay-450 { animation-delay: 450ms; }
+
+  /* Staggered children animation */
+  .stagger-children > * {
+    @apply animate-fade-in;
+    animation-fill-mode: backwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+  .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+  /* Interactive card states */
+  .interactive-card {
+    @apply transition-all duration-200 ease-out;
+  }
+  .interactive-card:hover {
+    @apply shadow-md border-border;
+    transform: translateY(-2px);
+  }
+  .interactive-card:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  /* Pulse animation for alerts */
+  .pulse-alert {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
 }

@@ -120,7 +120,7 @@ function EmailsContent() {
   const getBotName = (botId: string) => bots.find(b => b.id === botId)?.name || 'Unknown';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Email Archive</h1>
         <p className="text-muted-foreground">View all sent reports and email history</p>
