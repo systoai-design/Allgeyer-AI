@@ -75,7 +75,8 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { bot_run_id, company_id, bot_type, cadence = 'daily' } = await req.json();
+    // Accept optional period_start and period_end for date range support
+    const { bot_run_id, company_id, bot_type, cadence = 'daily', period_start, period_end } = await req.json();
 
     if (!bot_run_id || !company_id || !bot_type) {
       return new Response(
@@ -85,6 +86,7 @@ serve(async (req) => {
     }
 
     console.log(`Starting ${bot_type} bot run: ${bot_run_id} for company: ${company_id}`);
+    console.log(`Date range override: ${period_start || 'none'} to ${period_end || 'none'}`);
 
     // Update bot run status to running
     await supabase
@@ -112,8 +114,20 @@ serve(async (req) => {
 
     const isConnected = integration?.is_connected ?? false;
 
-    // Calculate date range based on cadence
-    const { periodStart, periodEnd } = calculatePeriod(cadence);
+    // Use provided date range or calculate based on cadence
+    let periodStart: string;
+    let periodEnd: string;
+    
+    if (period_start && period_end) {
+      periodStart = period_start;
+      periodEnd = period_end;
+      console.log(`Using provided date range: ${periodStart} to ${periodEnd}`);
+    } else {
+      const calculated = calculatePeriod(cadence);
+      periodStart = calculated.periodStart;
+      periodEnd = calculated.periodEnd;
+      console.log(`Calculated date range from cadence '${cadence}': ${periodStart} to ${periodEnd}`);
+    }
 
     // Get the bot ID
     const { data: bot } = await supabase

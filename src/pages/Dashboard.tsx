@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanySelector, getCompanyColor } from '@/hooks/useCompanySelector';
@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2, LinkIcon, AlertCircle } from 'lucide-react';
+import { Loader2, TrendingUp, Download, BarChart3, AlertTriangle, Mail, Building2, LinkIcon, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportKPIData } from '@/lib/csvExport';
 import { toast } from 'sonner';
@@ -46,6 +46,7 @@ function DashboardContent() {
   const [botRuns, setBotRuns] = useState<BotRun[]>([]);
   const [kpiHistory, setKpiHistory] = useState<KpiHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -57,96 +58,193 @@ function DashboardContent() {
   // Track which integrations are connected
   const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
 
-  // Fetch data when company or date range changes
-  useEffect(() => {
+  // Fetch data function - extracted for reuse
+  const fetchData = useCallback(async () => {
     if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
     
-    async function fetchData() {
-      setIsLoading(true);
-      
-      const startDate = format(dateRange!.from!, 'yyyy-MM-dd');
-      const endDate = format(dateRange!.to!, 'yyyy-MM-dd');
-      
-      try {
-        // Fetch bots
-        const { data: botsData } = await supabase
-          .from('bots')
-          .select('*');
-        if (botsData) setBots(botsData as Bot[]);
+    setIsLoading(true);
+    
+    const startDate = format(dateRange.from, 'yyyy-MM-dd');
+    const endDate = format(dateRange.to, 'yyyy-MM-dd');
+    
+    try {
+      // Fetch bots
+      const { data: botsData } = await supabase
+        .from('bots')
+        .select('*');
+      if (botsData) setBots(botsData as Bot[]);
 
-        // Fetch integrations to check what's connected
-        const { data: integrationsData } = await supabase
-          .from('integrations')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .eq('is_connected', true);
-        if (integrationsData) {
-          setConnectedIntegrations(integrationsData.map(i => i.integration_type));
-        }
-
-        // Fetch exceptions for selected company and date range (open/in_progress only for list)
-        const { data: exceptionsData } = await supabase
-          .from('exceptions')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .in('status', ['open', 'in_progress'])
-          .gte('created_at', startDate)
-          .lte('created_at', endDate + 'T23:59:59')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        if (exceptionsData) setExceptions(exceptionsData as Exception[]);
-
-        // Fetch ALL exceptions for charts within date range
-        const { data: allExceptionsData } = await supabase
-          .from('exceptions')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .gte('created_at', startDate)
-          .lte('created_at', endDate + 'T23:59:59');
-        if (allExceptionsData) setAllExceptions(allExceptionsData as Exception[]);
-
-        // Fetch recent emails within date range
-        const { data: emailsData } = await supabase
-          .from('email_logs')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .gte('created_at', startDate)
-          .lte('created_at', endDate + 'T23:59:59')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        if (emailsData) setRecentEmails(emailsData as EmailLog[]);
-
-        // Fetch recent bot runs within date range
-        const { data: runsData } = await supabase
-          .from('bot_runs')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .gte('created_at', startDate)
-          .lte('created_at', endDate + 'T23:59:59')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        if (runsData) setBotRuns(runsData as BotRun[]);
-
-        // Fetch KPI history within date range
-        const { data: kpiData } = await supabase
-          .from('kpi_history')
-          .select('*')
-          .eq('company_id', selectedCompany.id)
-          .gte('period_end', startDate)
-          .lte('period_end', endDate)
-          .order('period_end', { ascending: false })
-          .limit(500);
-        if (kpiData) setKpiHistory(kpiData as KpiHistory[]);
-
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setIsLoading(false);
+      // Fetch integrations to check what's connected
+      const { data: integrationsData } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .eq('is_connected', true);
+      if (integrationsData) {
+        setConnectedIntegrations(integrationsData.map(i => i.integration_type));
       }
-    }
 
-    fetchData();
+      // Fetch exceptions for selected company and date range (open/in_progress only for list)
+      const { data: exceptionsData } = await supabase
+        .from('exceptions')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .in('status', ['open', 'in_progress'])
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (exceptionsData) setExceptions(exceptionsData as Exception[]);
+
+      // Fetch ALL exceptions for charts within date range
+      const { data: allExceptionsData } = await supabase
+        .from('exceptions')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59');
+      if (allExceptionsData) setAllExceptions(allExceptionsData as Exception[]);
+
+      // Fetch recent emails within date range
+      const { data: emailsData } = await supabase
+        .from('email_logs')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (emailsData) setRecentEmails(emailsData as EmailLog[]);
+
+      // Fetch recent bot runs within date range
+      const { data: runsData } = await supabase
+        .from('bot_runs')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (runsData) setBotRuns(runsData as BotRun[]);
+
+      // Fetch KPI history within date range
+      const { data: kpiData } = await supabase
+        .from('kpi_history')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .gte('period_end', startDate)
+        .lte('period_end', endDate)
+        .order('period_end', { ascending: false })
+        .limit(500);
+      if (kpiData) setKpiHistory(kpiData as KpiHistory[]);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedCompany, dateRange]);
+
+  // Fetch data when company or date range changes
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Sync data handler - runs both Financial Control and CRM bots
+  const handleSyncData = async () => {
+    if (!selectedCompany || !dateRange?.from || !dateRange?.to) return;
+    
+    setIsSyncing(true);
+    toast.info('Starting data sync...', { id: 'sync-toast' });
+
+    try {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+
+      // Get bot IDs
+      const { data: botsData } = await supabase
+        .from('bots')
+        .select('id, bot_type')
+        .in('bot_type', ['financial_control', selectedCompany.company_type]);
+      
+      if (!botsData || botsData.length === 0) {
+        throw new Error('No bots found');
+      }
+
+      const financialBot = botsData.find(b => b.bot_type === 'financial_control');
+      const crmBot = botsData.find(b => b.bot_type === selectedCompany.company_type);
+
+      // Create bot run records
+      const botRuns: { id: string; bot_type: string }[] = [];
+
+      if (financialBot) {
+        const { data: fcRun } = await supabase
+          .from('bot_runs')
+          .insert({
+            bot_id: financialBot.id,
+            company_id: selectedCompany.id,
+            cadence: 'daily',
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+        if (fcRun) botRuns.push({ id: fcRun.id, bot_type: 'financial_control' });
+      }
+
+      if (crmBot) {
+        const { data: crmRun } = await supabase
+          .from('bot_runs')
+          .insert({
+            bot_id: crmBot.id,
+            company_id: selectedCompany.id,
+            cadence: 'daily',
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+        if (crmRun) botRuns.push({ id: crmRun.id, bot_type: selectedCompany.company_type });
+      }
+
+      // Call edge functions in parallel
+      const promises = botRuns.map(async (run) => {
+        if (run.bot_type === 'financial_control') {
+          return supabase.functions.invoke('run-financial-control-bot', {
+            body: {
+              bot_run_id: run.id,
+              company_id: selectedCompany.id,
+              cadence: 'daily',
+              period_start: startDate,
+              period_end: endDate,
+            },
+          });
+        } else {
+          return supabase.functions.invoke('run-crm-bot', {
+            body: {
+              bot_run_id: run.id,
+              company_id: selectedCompany.id,
+              bot_type: run.bot_type,
+              cadence: 'daily',
+              period_start: startDate,
+              period_end: endDate,
+            },
+          });
+        }
+      });
+
+      await Promise.all(promises);
+
+      toast.success('Data synced successfully!', { id: 'sync-toast' });
+      
+      // Refresh dashboard data
+      await fetchData();
+
+    } catch (error) {
+      console.error('Sync error:', error);
+      toast.error('Sync failed. Please try again.', { id: 'sync-toast' });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Check if company-specific CRM is connected
   const isCrmConnected = useMemo(() => {
@@ -350,7 +448,7 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Date Range Picker */}
+      {/* Date Range Picker + Actions */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <DateRangePicker
           dateRange={dateRange}
@@ -358,10 +456,26 @@ function DashboardContent() {
           selectedPreset={selectedPreset}
           onPresetChange={setSelectedPreset}
         />
-        <Button variant="outline" size="sm" onClick={handleExportKPIs} className="rounded-full transition-all duration-200">
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={handleSyncData} 
+            disabled={isSyncing}
+            className="rounded-full transition-all duration-200"
+          >
+            {isSyncing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {isSyncing ? 'Syncing...' : 'Sync Data'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportKPIs} className="rounded-full transition-all duration-200">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Financial Control KPIs (Universal - ALL companies) - Live Data from QBO */}
