@@ -44,8 +44,8 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse request
-    const { bot_run_id, company_id, cadence = 'daily' } = await req.json();
+    // Parse request - accept optional period_start and period_end for date range support
+    const { bot_run_id, company_id, cadence = 'daily', period_start, period_end } = await req.json();
 
     if (!bot_run_id || !company_id) {
       return new Response(
@@ -55,6 +55,7 @@ serve(async (req) => {
     }
 
     console.log(`Starting Financial Control bot run: ${bot_run_id} for company: ${company_id}`);
+    console.log(`Date range override: ${period_start || 'none'} to ${period_end || 'none'}`);
 
     // Update bot run status to running
     await supabase
@@ -144,10 +145,20 @@ serve(async (req) => {
 
     const realmId = config.realm_id;
     
-    // Calculate date range based on cadence
-    const { periodStart, periodEnd } = calculatePeriod(cadence);
+    // Use provided date range or calculate based on cadence
+    let periodStart: string;
+    let periodEnd: string;
     
-    console.log(`Fetching QBO data for period: ${periodStart} to ${periodEnd}`);
+    if (period_start && period_end) {
+      periodStart = period_start;
+      periodEnd = period_end;
+      console.log(`Using provided date range: ${periodStart} to ${periodEnd}`);
+    } else {
+      const calculated = calculatePeriod(cadence);
+      periodStart = calculated.periodStart;
+      periodEnd = calculated.periodEnd;
+      console.log(`Calculated date range from cadence '${cadence}': ${periodStart} to ${periodEnd}`);
+    }
 
     // Fetch transactions from QBO
     const transactions = await fetchQBOTransactions(accessToken, realmId, periodStart, periodEnd);
