@@ -1,296 +1,244 @@
 
-# UI/UX Improvement Plan
+# Apple/Mac Design System Implementation Plan
 
 ## Overview
-This plan focuses on enhancing the visual design, user experience, and perceived performance of the Bot Automation Platform. The improvements are organized into categories that can be implemented incrementally.
+This plan transforms the entire Bot Automation Platform to follow Apple/Mac design principles: clean whitespace, subtle shadows, rounded containers, smooth transitions, minimal borders, and refined typography. The new Emails page serves as the reference design.
 
 ---
 
-## 1. Skeleton Loading States (Perceived Speed)
+## Design Principles to Apply
 
-### Current Issue
-The dashboard shows a single centered spinner during loading, which feels slow and provides no context about what's loading.
-
-### Solution
-Replace the spinner with skeleton placeholders that match the actual layout.
-
-**Files to modify:**
-- `src/pages/Dashboard.tsx`
-- `src/components/dashboard/KpiCard.tsx`
-
-**Changes:**
-- Create a `KpiCardSkeleton` component that mimics the KPI card layout
-- Show skeleton grids for Financial KPIs, Company KPIs, and Charts sections
-- Add staggered fade-in animations when content loads
-
-```text
-+------------------+  +------------------+  +------------------+
-|  [====]    [==]  |  |  [====]    [==]  |  |  [====]    [==]  |
-|  [========]      |  |  [========]      |  |  [========]      |
-|  [===]           |  |  [===]           |  |  [===]           |
-+------------------+  +------------------+  +------------------+
-```
+### Core Apple Aesthetic
+- **Generous whitespace** - More breathing room between elements
+- **Subtle, rounded containers** - `rounded-2xl` with `border-border/50`
+- **Minimal visual noise** - Remove heavy borders, use soft shadows
+- **Pill-shaped controls** - Rounded-full buttons and tabs
+- **Progressive disclosure** - Actions appear on hover
+- **Smooth transitions** - 200ms duration on all interactive elements
+- **Muted backgrounds** - `bg-muted/40` for inputs, `bg-card` for containers
+- **Simplified typography** - Less bold, more refined headings
 
 ---
 
-## 2. Smooth Page Transitions
+## Files to Modify
 
-### Current Issue
-Pages swap instantly without any transition, making navigation feel abrupt.
+### 1. Global Styles & Layout
 
-### Solution
-Add fade-in animations to page content using existing Tailwind animation utilities.
+**`src/components/layout/DashboardLayout.tsx`**
+- Add more padding to main content area
+- Softer background with subtle gradient
 
-**Files to modify:**
-- `src/pages/Dashboard.tsx`
-- `src/pages/BotRuns.tsx`
-- `src/pages/Exceptions.tsx`
-- `src/pages/Reports.tsx`
-- `src/pages/Emails.tsx`
-- `src/pages/Settings.tsx`
+**`src/index.css`**
+- Add new utility classes for Apple-style components
+- Refine scrollbar styling to be more minimal
 
-**Changes:**
-- Wrap main content in containers with `animate-fade-in` class
-- Add staggered delays for different sections using `animation-delay` utilities
+### 2. Dashboard Page
 
----
+**`src/pages/Dashboard.tsx`**
+- Simplify header with refined typography
+- Convert tabs to pill-shaped navigation
+- Add subtle card borders with `border-border/50`
+- Improve quick stats with rounded-full containers
+- Add staggered entrance animations
 
-## 3. Interactive Hover States and Micro-interactions
+**`src/components/dashboard/KpiCard.tsx`**
+- Softer card styling with `rounded-2xl`
+- Gentler hover effects
+- Refined icon containers
 
-### Current Issue
-Cards and interactive elements have minimal hover feedback.
+**`src/components/dashboard/ExceptionsList.tsx`**
+- Clean list-style layout (similar to Emails)
+- Hover-reveal actions
+- Rounded container
 
-### Solution
-Enhance hover states with subtle scale, shadow, and border transitions.
+**`src/components/dashboard/RecentReportsCard.tsx`**
+- Match the card styling to new system
+- Cleaner list items
 
-**Files to modify:**
-- `src/components/dashboard/KpiCard.tsx`
-- `src/components/dashboard/ExceptionsList.tsx`
-- `src/components/dashboard/RecentReportsCard.tsx`
-- `src/index.css`
+**`src/components/dashboard/KpiTrendChart.tsx`**
+**`src/components/dashboard/ExceptionBarChart.tsx`**
+**`src/components/dashboard/PerformanceDonutChart.tsx`**
+- Wrap in cleaner containers
+- Add subtle entrance animations
 
-**Changes:**
-- Add `hover:scale-[1.02]` and `hover:shadow-md` to KPI cards
-- Add subtle border color transitions on hover
-- Add press feedback with `active:scale-[0.98]`
-- Create reusable utility classes for consistent interactions
+### 3. Reports Page
 
----
+**`src/pages/Reports.tsx`**
+- Convert tabs to pill-shaped filter buttons
+- Simplify card design to match Emails style
+- Add search with borderless input
+- Clean modal/dialog styling
 
-## 4. Enhanced Sidebar Design
+### 4. Exceptions Page
 
-### Current Issue
-The sidebar is functional but could be more polished with better visual hierarchy.
+**`src/pages/Exceptions.tsx`**
+- Pill-shaped filter controls
+- Convert table to clean list view (like Emails)
+- Softer stat cards with rounded corners
+- Progressive disclosure for actions
 
-### Solution
-Add subtle improvements to make the sidebar feel more premium.
+### 5. Bot Runs Page
 
-**Files to modify:**
-- `src/components/layout/AppSidebar.tsx`
+**`src/pages/BotRuns.tsx`**
+- Clean card-based bot status display
+- Simplified stat cards
+- Convert table to list-style rows
+- Pill-shaped filter controls
 
-**Changes:**
-- Add a subtle gradient or glow to the logo area
-- Add active indicator bar on the left side of active nav items
-- Smooth transitions for hover states
-- Add subtle separators between navigation groups
-- Animate the company selector dropdown
+### 6. Bots Configuration Page
 
----
+**`src/pages/Bots.tsx`**
+- Refined bot selector with subtle selection state
+- Clean tab navigation
+- Softer card containers
+- Simplified list items for schedules/recipients/thresholds
 
-## 5. Improved Tab Transitions
+### 7. Settings Page
 
-### Current Issue
-Cadence tabs (Daily/Weekly/Monthly/Quarterly) switch instantly.
+**`src/pages/Settings.tsx`**
+- Cleaner integration cards
+- Softer button styling
+- Refined visual hierarchy
 
-### Solution
-Add smooth content transitions when switching between tabs.
+### 8. Sidebar
 
-**Files to modify:**
-- `src/pages/Dashboard.tsx`
-- `tailwind.config.ts`
-
-**Changes:**
-- Add `data-[state=active]:animate-fade-in` to TabsContent
-- Create a slide transition effect for tab changes
-- Add a subtle underline animation to active tab indicator
-
----
-
-## 6. Better Empty States
-
-### Current Issue
-Empty states are functional but lack visual appeal and clear calls-to-action.
-
-### Solution
-Design more engaging empty states with illustrations and clearer guidance.
-
-**Files to modify:**
-- `src/components/dashboard/ExceptionsList.tsx`
-- `src/components/dashboard/RecentReportsCard.tsx`
-- `src/pages/Dashboard.tsx`
-
-**Changes:**
-- Add subtle background patterns or gradients
-- Use larger, more expressive icons
-- Add animated elements (subtle pulse or float)
-- Clearer CTA buttons with hover effects
+**`src/components/layout/AppSidebar.tsx`**
+- Softer active states
+- More refined hover effects
+- Cleaner user section
+- Subtle separator styling
 
 ---
 
-## 7. Chart Improvements
+## Technical Implementation Details
 
-### Current Issue
-Charts work but could be more visually polished.
-
-### Solution
-Enhance chart styling and add loading/empty states.
-
-**Files to modify:**
-- `src/components/dashboard/KpiTrendChart.tsx`
-- `src/components/dashboard/ExceptionBarChart.tsx`
-- `src/components/dashboard/PerformanceDonutChart.tsx`
-
-**Changes:**
-- Add skeleton states for charts while loading
-- Smoother gradient fills for line charts
-- Add hover animations to chart elements
-- Better empty state when no data exists
-- Animate chart entrance (fade in from bottom)
-
----
-
-## 8. Quick Stats Header Enhancement
-
-### Current Issue
-The quick stats badges in the header are compact but could be more visually distinct.
-
-### Solution
-Make the quick stats more prominent and add subtle animations.
-
-**Files to modify:**
-- `src/pages/Dashboard.tsx`
-
-**Changes:**
-- Add pulse animation to exception count when > 0
-- Add color-coded borders based on status
-- Add tooltip with more details on hover
-- Animate number changes with a count-up effect
-
----
-
-## 9. Responsive Design Improvements
-
-### Current Issue
-The fixed sidebar layout may not work well on all screen sizes.
-
-### Solution
-Improve the responsive behavior for different devices.
-
-**Files to modify:**
-- `src/components/layout/DashboardLayout.tsx`
-- `src/components/layout/AppSidebar.tsx`
-
-**Changes:**
-- Add collapsible sidebar for tablet/medium screens
-- Add mobile hamburger menu with slide-out drawer
-- Adjust KPI grid layouts for different breakpoints
-- Stack quick stats vertically on mobile
-
----
-
-## 10. Toast and Notification Polish
-
-### Current Issue
-Toast notifications are functional but could be more visually consistent.
-
-### Solution
-Enhance toast styling to match the design system.
-
-**Files to modify:**
-- `src/components/ui/sonner.tsx`
-
-**Changes:**
-- Add slide-in animation from the right
-- Add subtle shadow and blur backdrop
-- Color-code borders based on notification type
-- Add progress bar for auto-dismiss timing
-
----
-
-## Implementation Priority
-
-| Priority | Improvement | Impact | Effort |
-|----------|-------------|--------|--------|
-| 1 | Skeleton Loading States | High | Medium |
-| 2 | Page Transitions | High | Low |
-| 3 | Interactive Hover States | Medium | Low |
-| 4 | Tab Transitions | Medium | Low |
-| 5 | Enhanced Sidebar | Medium | Medium |
-| 6 | Chart Improvements | Medium | Medium |
-| 7 | Better Empty States | Low | Low |
-| 8 | Quick Stats Enhancement | Low | Low |
-| 9 | Responsive Design | High | High |
-| 10 | Toast Polish | Low | Low |
-
----
-
-## Technical Implementation Notes
-
-### New Tailwind Animations to Add
-```typescript
-// In tailwind.config.ts keyframes
-"slide-up": {
-  from: { opacity: "0", transform: "translateY(20px)" },
-  to: { opacity: "1", transform: "translateY(0)" }
-},
-"count-up": {
-  from: { opacity: "0", transform: "scale(0.8)" },
-  to: { opacity: "1", transform: "scale(1)" }
-}
-
-// In animation
-"slide-up": "slide-up 0.4s ease-out",
-"count-up": "count-up 0.3s ease-out"
-```
-
-### Skeleton Component Pattern
-```typescript
-// Create src/components/ui/skeleton-loader.tsx
-function KpiCardSkeleton() {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-8 w-8 rounded-lg" />
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <Skeleton className="h-8 w-20 mb-2" />
-        <Skeleton className="h-3 w-16" />
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-### CSS Utilities to Add
+### New CSS Utilities (index.css)
 ```css
-/* Animation delay utilities */
-.delay-75 { animation-delay: 75ms; }
-.delay-150 { animation-delay: 150ms; }
-.delay-225 { animation-delay: 225ms; }
-.delay-300 { animation-delay: 300ms; }
-
-/* Staggered children animation */
-.stagger-children > * {
-  animation: fade-in 0.3s ease-out backwards;
+/* Apple-style container */
+.apple-card {
+  @apply bg-card rounded-2xl border border-border/50 shadow-sm;
 }
-.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+
+/* Apple-style input */
+.apple-input {
+  @apply bg-muted/40 border-0 rounded-xl;
+}
+
+/* Apple-style pill button */
+.apple-pill {
+  @apply px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200;
+}
+
+.apple-pill-active {
+  @apply bg-foreground text-background shadow-sm;
+}
+
+.apple-pill-inactive {
+  @apply bg-muted/60 text-muted-foreground hover:bg-muted;
+}
 ```
+
+### Component Pattern Changes
+
+**Headers**
+```
+Before:
+<h1 className="text-3xl font-bold">Title</h1>
+
+After:
+<h1 className="text-2xl font-semibold tracking-tight">Title</h1>
+<p className="text-muted-foreground text-sm">Subtitle</p>
+```
+
+**Cards**
+```
+Before:
+<Card className="border">
+
+After:
+<div className="bg-card rounded-2xl border border-border/50 shadow-sm">
+```
+
+**Tabs to Pills**
+```
+Before:
+<TabsList><TabsTrigger>Daily</TabsTrigger></TabsList>
+
+After:
+<div className="flex gap-2">
+  <button className={cn("apple-pill", active ? "apple-pill-active" : "apple-pill-inactive")}>
+    Daily
+  </button>
+</div>
+```
+
+**List Items**
+```
+Before:
+<TableRow><TableCell>...</TableCell></TableRow>
+
+After:
+<div className="group flex items-center gap-4 px-4 py-3 hover:bg-muted/50 
+  transition-colors duration-200 cursor-pointer rounded-xl">
+  ...
+</div>
+```
+
+---
+
+## Specific Page Changes
+
+### Dashboard
+1. Header: Reduce from `text-3xl font-bold` to `text-2xl font-semibold tracking-tight`
+2. Quick stats: Change to rounded-full pill shapes
+3. Cadence tabs: Convert to pill-style navigation with counts
+4. KPI sections: Add subtle section headers with muted backgrounds
+5. Cards: Apply `rounded-2xl border-border/50`
+6. Charts container: Wrap in clean containers
+
+### Reports
+1. Tabs: Convert to pill-style filter buttons (like Emails)
+2. Search: Borderless with `bg-muted/40`
+3. Cards: Simplify to match Emails style
+4. Empty state: Larger icons, cleaner typography
+
+### Exceptions
+1. Stat cards: Rounder corners, softer shadows
+2. Table: Convert to list-style rows with hover states
+3. Filters: Pill-shaped controls
+4. Actions: Appear on hover (progressive disclosure)
+
+### Bot Runs
+1. Bot status cards: Cleaner with subtle hover
+2. Stats grid: Match new card style
+3. Table: Convert to clean list rows
+4. Filters: Pill-shaped dropdowns
+
+### Bots
+1. Bot selector: Subtle selection indicator
+2. Tabs: Cleaner pill-style
+3. Lists: Clean row-based layout
+4. Dialogs: Refined modal styling
+
+### Settings
+1. Integration cards: Softer styling
+2. Buttons: More refined with subtle borders
+3. Overall: More whitespace
+
+### Sidebar
+1. Nav items: Softer hover with 0.5px translate
+2. Company selector: Cleaner dropdown
+3. User section: More refined styling
+
+---
+
+## Animation Refinements
+
+All transitions use:
+- Duration: `200ms`
+- Easing: `ease-out`
+- Hover translate: `translateY(-2px)` or `translateX(0.5px)`
+- Active press: `scale-[0.98]`
 
 ---
 
@@ -298,16 +246,28 @@ function KpiCardSkeleton() {
 
 | File | Changes |
 |------|---------|
-| `src/pages/Dashboard.tsx` | Skeleton loading, page transitions, tab animations, quick stats |
-| `src/components/dashboard/KpiCard.tsx` | Skeleton variant, hover states, animations |
-| `src/components/dashboard/ExceptionsList.tsx` | Improved empty state, hover animations |
-| `src/components/dashboard/RecentReportsCard.tsx` | Improved empty state, hover animations |
-| `src/components/dashboard/KpiTrendChart.tsx` | Loading state, entrance animation |
-| `src/components/dashboard/ExceptionBarChart.tsx` | Loading state, entrance animation |
-| `src/components/dashboard/PerformanceDonutChart.tsx` | Loading state, entrance animation |
-| `src/components/layout/AppSidebar.tsx` | Active indicator, transitions, mobile menu |
-| `src/components/layout/DashboardLayout.tsx` | Responsive sidebar behavior |
-| `src/index.css` | Animation utilities, stagger classes |
-| `tailwind.config.ts` | New keyframes and animation utilities |
-| `src/components/ui/sonner.tsx` | Toast styling improvements |
+| `src/index.css` | Add Apple-style utility classes |
+| `src/components/layout/DashboardLayout.tsx` | Increase padding, softer background |
+| `src/components/layout/AppSidebar.tsx` | Refine hover states, cleaner sections |
+| `src/pages/Dashboard.tsx` | Pill tabs, refined cards, typography |
+| `src/pages/Reports.tsx` | Pill filters, cleaner cards, list style |
+| `src/pages/Exceptions.tsx` | List view, pill filters, refined stats |
+| `src/pages/BotRuns.tsx` | Clean cards, list rows, pill filters |
+| `src/pages/Bots.tsx` | Refined selector, cleaner tabs, lists |
+| `src/pages/Settings.tsx` | Softer cards, refined buttons |
+| `src/components/dashboard/KpiCard.tsx` | Rounded corners, softer hover |
+| `src/components/dashboard/ExceptionsList.tsx` | List-style rows |
+| `src/components/dashboard/RecentReportsCard.tsx` | Cleaner list items |
+| `src/components/dashboard/KpiTrendChart.tsx` | Container styling |
+| `src/components/dashboard/ExceptionBarChart.tsx` | Container styling |
+| `src/components/dashboard/PerformanceDonutChart.tsx` | Container styling |
+
+---
+
+## Estimated Impact
+
+- **13 files modified**
+- **Consistent design language** across all pages
+- **Improved perceived performance** with smooth transitions
+- **Professional, modern aesthetic** matching Apple's design philosophy
 
