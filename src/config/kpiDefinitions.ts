@@ -114,28 +114,39 @@ export const propertyHaloKpis: Record<CadenceType, KpiDefinition[]> = {
 };
 
 // Unique Painting KPIs
-// Data source: Labortech integration required
+// Data source: Jobber integration
 export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
   daily: [
-    { key: 'leads', label: 'Leads', icon: Users, format: 'number', trendLabel: 'vs yesterday' },
-    { key: 'estimates_sent', label: 'Estimates Sent', icon: FileCheck, format: 'number', trendLabel: 'vs yesterday' },
-    { key: 'jobs_completed', label: 'Jobs Completed', icon: Hammer, format: 'number', trendLabel: 'vs yesterday' },
+    { key: 'open_requests', label: 'Open Requests', icon: ClipboardList, format: 'number', trendLabel: 'current' },
+    { key: 'approved_quotes', label: 'Approved Quotes', icon: FileCheck, format: 'number', trendLabel: 'current' },
+    { key: 'active_jobs', label: 'Active Jobs', icon: Hammer, format: 'number', trendLabel: 'current' },
+    { key: 'pending_invoices', label: 'Pending Invoices', icon: CreditCard, format: 'number', trendLabel: 'current' },
+    { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'current' },
+    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'current' },
   ],
   weekly: [
-    { key: 'jobs_sold', label: 'Jobs Sold', icon: Target, format: 'number', trendLabel: 'vs last week' },
-    { key: 'revenue_booked', label: 'Revenue Booked', icon: DollarSign, format: 'currency', trendLabel: 'vs last week' },
-    { key: 'completed_jobs', label: 'Completed Jobs', icon: Hammer, format: 'number', trendLabel: 'vs last week' },
+    { key: 'open_requests', label: 'Open Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
+    { key: 'approved_quotes', label: 'Approved Quotes', icon: FileCheck, format: 'number', trendLabel: 'this week' },
+    { key: 'active_jobs', label: 'Active Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
+    { key: 'pending_invoices', label: 'Pending Invoices', icon: CreditCard, format: 'number', trendLabel: 'this week' },
+    { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this week' },
+    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this week' },
   ],
   monthly: [
-    { key: 'profit_per_job', label: 'Profit per Job', icon: DollarSign, format: 'currency', trendLabel: 'vs last month' },
-    { key: 'crew_utilization', label: 'Crew Utilization', icon: Percent, format: 'percent', trendLabel: 'vs last month' },
-    { key: 'total_revenue', label: 'Total Revenue', icon: TrendingUp, format: 'currency', trendLabel: 'vs last month' },
-    { key: 'completed_jobs_monthly', label: 'Completed Jobs', icon: Hammer, format: 'number', trendLabel: 'vs last month' },
+    { key: 'open_requests', label: 'Open Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
+    { key: 'approved_quotes', label: 'Approved Quotes', icon: FileCheck, format: 'number', trendLabel: 'this month' },
+    { key: 'active_jobs', label: 'Active Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
+    { key: 'pending_invoices', label: 'Pending Invoices', icon: CreditCard, format: 'number', trendLabel: 'this month' },
+    { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this month' },
+    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this month' },
   ],
   quarterly: [
-    { key: 'revenue_growth', label: 'Revenue Growth', icon: TrendingUp, format: 'percent', trendLabel: 'vs last quarter' },
-    { key: 'margin_trend', label: 'Margin Trend', icon: BarChart3, format: 'percent', trendLabel: 'vs last quarter' },
-    { key: 'customer_acquisition_cost', label: 'Customer Acquisition Cost', icon: Users, format: 'currency', trendLabel: 'vs last quarter' },
+    { key: 'open_requests', label: 'Open Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
+    { key: 'approved_quotes', label: 'Approved Quotes', icon: FileCheck, format: 'number', trendLabel: 'this quarter' },
+    { key: 'active_jobs', label: 'Active Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
+    { key: 'pending_invoices', label: 'Pending Invoices', icon: CreditCard, format: 'number', trendLabel: 'this quarter' },
+    { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this quarter' },
+    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this quarter' },
   ],
 };
 

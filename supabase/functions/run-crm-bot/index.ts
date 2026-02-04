@@ -6,25 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/**
- * Placeholder CRM Bot Runner
- * 
- * This edge function handles bot runs for:
- * - Property Halo Bot (PETE CRM)
- * - Unique Painting Bot (Labortech)
- * - ATI Security Bot (Jobber)
- * 
- * Currently returns placeholder data until integrations are implemented.
- */
+const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
+const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
+
+interface JobberTokens {
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+}
 
 interface CRMBotRunSummary {
   integration_status: 'not_connected' | 'connected';
   integration_type: string;
   bot_type: string;
   message: string;
-  placeholder_kpis: Record<string, number>;
+  kpis: Record<string, number>;
   period_start: string;
   period_end: string;
+  source: string;
 }
 
 const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[] }> = {
@@ -40,25 +39,25 @@ const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[
     ],
   },
   unique_painting: {
-    integration_type: 'labortech',
+    integration_type: 'jobber',
     kpi_names: [
-      'Jobs Completed',
-      'Revenue This Period',
-      'Active Crews',
-      'Average Job Duration',
-      'Customer Satisfaction',
-      'Quote Acceptance Rate',
+      'Open Requests',
+      'Approved Quotes',
+      'Active Jobs',
+      'Pending Invoices',
+      'Total Receivables',
+      'Quote Value',
     ],
   },
   ati_security: {
     integration_type: 'jobber',
     kpi_names: [
-      'Service Calls',
-      'Response Time (mins)',
-      'Active Contracts',
-      'Monthly Recurring Revenue',
-      'Technician Utilization',
-      'Customer Retention Rate',
+      'Open Requests',
+      'Approved Quotes',
+      'Active Jobs',
+      'Pending Invoices',
+      'Total Receivables',
+      'Quote Value',
     ],
   },
 };
@@ -71,10 +70,11 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const jobberClientId = Deno.env.get('JOBBER_CLIENT_ID');
+    const jobberClientSecret = Deno.env.get('JOBBER_CLIENT_SECRET');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse request
     const { bot_run_id, company_id, bot_type, cadence = 'daily' } = await req.json();
 
     if (!bot_run_id || !company_id || !bot_type) {
@@ -103,7 +103,7 @@ serve(async (req) => {
     }
 
     // Check if integration is connected
-    const { data: integration } = await supabase
+    const { data: integration, error: intError } = await supabase
       .from('integrations')
       .select('*')
       .eq('company_id', company_id)
@@ -112,7 +112,7 @@ serve(async (req) => {
 
     const isConnected = integration?.is_connected ?? false;
 
-    // Calculate date range
+    // Calculate date range based on cadence
     const { periodStart, periodEnd } = calculatePeriod(cadence);
 
     // Get the bot ID
@@ -125,71 +125,111 @@ serve(async (req) => {
     const botId = bot?.id;
 
     let summary: CRMBotRunSummary;
+    let kpis: Record<string, number> = {};
 
     if (!isConnected) {
-      // Return placeholder data with message about integration
+      console.log(`Integration ${crmConfig.integration_type} not connected for company ${company_id}`);
+      
       summary = {
         integration_status: 'not_connected',
         integration_type: crmConfig.integration_type,
         bot_type,
-        message: `${crmConfig.integration_type.toUpperCase().replace('_', ' ')} integration not connected. Please connect the integration in Settings to pull live data.`,
-        placeholder_kpis: generatePlaceholderKPIs(crmConfig.kpi_names),
+        message: `${crmConfig.integration_type.toUpperCase().replace('_', ' ')} integration not connected. Please connect in Settings.`,
+        kpis: {},
         period_start: periodStart,
         period_end: periodEnd,
+        source: 'none',
       };
 
-      // Generate placeholder KPIs (marked as such in metadata)
+      // Create exception about missing integration
       if (botId) {
-        for (const kpiName of crmConfig.kpi_names) {
-          await supabase.from('kpi_history').insert({
-            company_id: company_id,
-            bot_id: botId,
-            cadence,
-            period_start: periodStart,
-            period_end: periodEnd,
-            kpi_name: kpiName,
-            kpi_value: summary.placeholder_kpis[kpiName],
-            kpi_status: 'on_track',
-            metadata: { 
-              source: 'placeholder', 
-              integration_type: crmConfig.integration_type,
-              message: 'Placeholder data - integration not connected',
-              generated_at: new Date().toISOString() 
-            },
-          });
-        }
-
-        // Create an informational exception about missing integration
         await supabase.from('exceptions').insert({
           company_id: company_id,
           bot_id: botId,
           exception_type: 'integration_missing',
           title: `${crmConfig.integration_type.toUpperCase().replace('_', ' ')} Not Connected`,
-          description: `The ${crmConfig.integration_type.replace('_', ' ')} integration is not connected. Connect it in Settings to enable live data syncing for this bot.`,
+          description: `Connect ${crmConfig.integration_type.replace('_', ' ')} in Settings to enable live data.`,
           severity: 'medium',
           status: 'open',
-          data: {
-            integration_type: crmConfig.integration_type,
-            bot_type,
-          },
         });
       }
-    } else {
-      // Integration is connected - placeholder for future implementation
+    } else if (crmConfig.integration_type === 'jobber') {
+      // Fetch live data from Jobber
+      console.log('Fetching live data from Jobber...');
+      
+      const config = integration.config as JobberTokens;
+      let accessToken = config.access_token;
+      
+      // Check if token needs refresh
+      const tokenExpiresAt = new Date(config.token_expires_at);
+      const now = new Date();
+      
+      if (now >= new Date(tokenExpiresAt.getTime() - 5 * 60 * 1000)) {
+        console.log('Jobber token expired, refreshing...');
+        
+        const tokenResponse = await fetch(JOBBER_TOKEN_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            client_id: jobberClientId!,
+            client_secret: jobberClientSecret!,
+            refresh_token: config.refresh_token,
+          }),
+        });
+
+        const tokens = await tokenResponse.json();
+
+        if (!tokenResponse.ok) {
+          console.error('Jobber token refresh failed:', tokens);
+          await supabase.from('integrations').update({ is_connected: false }).eq('id', integration.id);
+          await updateBotRunFailed(supabase, bot_run_id, 'Token refresh failed. Please reconnect Jobber.');
+          return new Response(
+            JSON.stringify({ error: 'Token refresh failed' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+          );
+        }
+
+        accessToken = tokens.access_token;
+        const expiresIn = tokens.expires_in || 7200;
+        
+        await supabase.from('integrations').update({
+          config: {
+            ...config,
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+          },
+          last_sync_at: new Date().toISOString(),
+        }).eq('id', integration.id);
+        
+        console.log('Jobber token refreshed successfully');
+      }
+
+      // Fetch KPIs from Jobber GraphQL API
+      kpis = await fetchJobberKPIs(accessToken, periodStart, periodEnd);
+      
+      console.log('Jobber KPIs fetched:', kpis);
+
+      // Update last sync
+      await supabase.from('integrations').update({
+        last_sync_at: new Date().toISOString(),
+      }).eq('id', integration.id);
+
       summary = {
         integration_status: 'connected',
-        integration_type: crmConfig.integration_type,
+        integration_type: 'jobber',
         bot_type,
-        message: `${crmConfig.integration_type.toUpperCase().replace('_', ' ')} integration connected. Live data sync implementation pending.`,
-        placeholder_kpis: generatePlaceholderKPIs(crmConfig.kpi_names),
+        message: 'Live data fetched from Jobber successfully.',
+        kpis,
         period_start: periodStart,
         period_end: periodEnd,
+        source: 'jobber',
       };
 
-      // TODO: Implement actual CRM data fetching when APIs are available
-      // For now, still generate placeholder KPIs
+      // Store KPIs in kpi_history
       if (botId) {
-        for (const kpiName of crmConfig.kpi_names) {
+        for (const [kpiName, value] of Object.entries(kpis)) {
           await supabase.from('kpi_history').insert({
             company_id: company_id,
             bot_id: botId,
@@ -197,29 +237,37 @@ serve(async (req) => {
             period_start: periodStart,
             period_end: periodEnd,
             kpi_name: kpiName,
-            kpi_value: summary.placeholder_kpis[kpiName],
+            kpi_value: value,
             kpi_status: 'on_track',
-            metadata: { 
-              source: crmConfig.integration_type,
-              message: 'API implementation pending',
-              generated_at: new Date().toISOString() 
+            metadata: {
+              source: 'jobber',
+              generated_at: new Date().toISOString(),
             },
           });
         }
       }
+    } else {
+      // PETE CRM or other - placeholder for now
+      summary = {
+        integration_status: 'connected',
+        integration_type: crmConfig.integration_type,
+        bot_type,
+        message: `${crmConfig.integration_type} API implementation pending.`,
+        kpis: {},
+        period_start: periodStart,
+        period_end: periodEnd,
+        source: 'pending',
+      };
     }
 
     // Update bot run as completed
-    await supabase
-      .from('bot_runs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        summary: summary as unknown as Record<string, unknown>,
-      })
-      .eq('id', bot_run_id);
+    await supabase.from('bot_runs').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      summary: summary as unknown as Record<string, unknown>,
+    }).eq('id', bot_run_id);
 
-    console.log(`${bot_type} bot run completed`);
+    console.log(`${bot_type} bot run completed with ${Object.keys(kpis).length} KPIs`);
 
     return new Response(
       JSON.stringify({ success: true, summary }),
@@ -235,6 +283,152 @@ serve(async (req) => {
     );
   }
 });
+
+async function fetchJobberKPIs(accessToken: string, periodStart: string, periodEnd: string): Promise<Record<string, number>> {
+  const kpis: Record<string, number> = {};
+
+  // Query for requests count - just get totalCount and basic info
+  const requestsQuery = `
+    query GetRequests {
+      requests(first: 100) {
+        nodes {
+          id
+          createdAt
+          title
+        }
+        totalCount
+      }
+    }
+  `;
+
+  // Query for quotes
+  const quotesQuery = `
+    query GetQuotes {
+      quotes(first: 100) {
+        nodes {
+          id
+          quoteStatus
+          amounts {
+            total
+          }
+        }
+        totalCount
+      }
+    }
+  `;
+
+  // Query for jobs
+  const jobsQuery = `
+    query GetJobs {
+      jobs(first: 100) {
+        nodes {
+          id
+          jobStatus
+          total
+        }
+        totalCount
+      }
+    }
+  `;
+
+  // Query for invoices - use correct InvoiceAmounts fields
+  const invoicesQuery = `
+    query GetInvoices {
+      invoices(first: 100) {
+        nodes {
+          id
+          invoiceStatus
+          amounts {
+            total
+            depositAmount
+            invoiceBalance
+          }
+        }
+        totalCount
+      }
+    }
+  `;
+
+  try {
+    // Fetch requests
+    const requestsResponse = await makeJobberRequest(accessToken, requestsQuery);
+    console.log('Requests response:', JSON.stringify(requestsResponse));
+    if (requestsResponse?.data?.requests) {
+      const totalCount = requestsResponse.data.requests.totalCount || 0;
+      const requests = requestsResponse.data.requests.nodes || [];
+      console.log(`Found ${totalCount} total requests, ${requests.length} in response`);
+      kpis['Open Requests'] = totalCount;
+    } else {
+      kpis['Open Requests'] = 0;
+    }
+
+    // Fetch quotes
+    const quotesResponse = await makeJobberRequest(accessToken, quotesQuery);
+    if (quotesResponse?.data?.quotes) {
+      const quotes = quotesResponse.data.quotes.nodes || [];
+      const approvedQuotes = quotes.filter((q: any) => q.quoteStatus === 'APPROVED');
+      kpis['Approved Quotes'] = approvedQuotes.length;
+      
+      // Calculate total quote value
+      const totalQuoteValue = quotes.reduce((sum: number, q: any) => {
+        return sum + (q.amounts?.total || 0);
+      }, 0);
+      kpis['Quote Value'] = Math.round(totalQuoteValue * 100) / 100;
+    }
+
+    // Fetch jobs
+    const jobsResponse = await makeJobberRequest(accessToken, jobsQuery);
+    if (jobsResponse?.data?.jobs) {
+      const jobs = jobsResponse.data.jobs.nodes || [];
+      const activeJobs = jobs.filter((j: any) => 
+        j.jobStatus === 'ACTIVE' || j.jobStatus === 'IN_PROGRESS' || j.jobStatus === 'TODAY' || j.jobStatus === 'REQUIRES_INVOICING'
+      );
+      kpis['Active Jobs'] = activeJobs.length;
+    }
+
+    // Fetch invoices
+    const invoicesResponse = await makeJobberRequest(accessToken, invoicesQuery);
+    if (invoicesResponse?.data?.invoices) {
+      const invoices = invoicesResponse.data.invoices.nodes || [];
+      const pendingInvoices = invoices.filter((i: any) => 
+        i.invoiceStatus === 'DRAFT' || i.invoiceStatus === 'AWAITING_PAYMENT'
+      );
+      kpis['Pending Invoices'] = pendingInvoices.length;
+      
+      // Calculate total receivables using invoiceBalance
+      const totalReceivables = invoices.reduce((sum: number, i: any) => {
+        return sum + (i.amounts?.invoiceBalance || 0);
+      }, 0);
+      kpis['Total Receivables'] = Math.round(totalReceivables * 100) / 100;
+    }
+
+  } catch (error) {
+    console.error('Error fetching Jobber data:', error);
+  }
+
+  return kpis;
+}
+
+async function makeJobberRequest(accessToken: string, query: string, variables = {}): Promise<any> {
+  const response = await fetch(JOBBER_GRAPHQL_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-JOBBER-GRAPHQL-VERSION': '2023-08-18',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const data = await response.json();
+
+  if (data.errors) {
+    console.error('Jobber GraphQL errors:', data.errors);
+  }
+
+  return data;
+}
 
 function calculatePeriod(cadence: string): { periodStart: string; periodEnd: string } {
   const now = new Date();
@@ -270,34 +464,10 @@ function calculatePeriod(cadence: string): { periodStart: string; periodEnd: str
   };
 }
 
-function generatePlaceholderKPIs(kpiNames: string[]): Record<string, number> {
-  const kpis: Record<string, number> = {};
-  
-  for (const name of kpiNames) {
-    // Generate somewhat realistic placeholder values
-    if (name.includes('Rate') || name.includes('Satisfaction') || name.includes('Utilization')) {
-      kpis[name] = Math.round(70 + Math.random() * 25); // 70-95%
-    } else if (name.includes('Revenue')) {
-      kpis[name] = Math.round(10000 + Math.random() * 40000); // $10k-$50k
-    } else if (name.includes('Time')) {
-      kpis[name] = Math.round(15 + Math.random() * 30); // 15-45 mins
-    } else if (name.includes('Duration')) {
-      kpis[name] = Math.round(2 + Math.random() * 6); // 2-8 days
-    } else {
-      kpis[name] = Math.round(5 + Math.random() * 45); // 5-50 count
-    }
-  }
-  
-  return kpis;
-}
-
 async function updateBotRunFailed(supabase: any, botRunId: string, errorMessage: string): Promise<void> {
-  await supabase
-    .from('bot_runs')
-    .update({
-      status: 'failed',
-      completed_at: new Date().toISOString(),
-      error_message: errorMessage,
-    })
-    .eq('id', botRunId);
+  await supabase.from('bot_runs').update({
+    status: 'failed',
+    completed_at: new Date().toISOString(),
+    error_message: errorMessage,
+  }).eq('id', botRunId);
 }
