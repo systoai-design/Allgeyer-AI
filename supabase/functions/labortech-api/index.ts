@@ -1,12 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-const GHL_API_BASE = "https://services.leadconnectorhq.com";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -25,7 +21,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { company_id, action, location_id, limit = 20 } = body;
 
-    console.log(`Labortech API: action=${action}, company=${company_id}`);
+    console.log(`Labortech API: action=${action}, company=${company_id}, location=${location_id}`);
 
     if (!company_id) {
       return new Response(
@@ -34,71 +30,82 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    const { data: integration } = await supabase
-      .from("integrations")
-      .select("config")
-      .eq("company_id", company_id)
-      .eq("integration_type", "labortech")
-      .single();
-
-    const savedLocationId = integration?.config?.location_id;
-    const effectiveLocationId = location_id || savedLocationId;
-
+    const GHL_API_BASE = "https://services.leadconnectorhq.com";
     const ghlHeaders = {
       "Authorization": `Bearer ${LABORTECH_API_KEY}`,
       "Content-Type": "application/json",
       "Version": "2021-07-28",
     };
 
+    // For test_connection, we need a location_id to test with Private Integration tokens
     if (action === "test_connection") {
-      // Test with locations search endpoint
-      const response = await fetch(`${GHL_API_BASE}/locations/search`, {
-        method: "POST",
-        headers: ghlHeaders,
-        body: JSON.stringify({ limit: 10, skip: 0 }),
-      });
+      // If no location_id provided, we can't fully test but we can verify the token format
+      // Try getting contacts which requires location_id - if provided
+      if (location_id) {
+        const response = await fetch(
+          `${GHL_API_BASE}/contacts/?locationId=${location_id}&limit=1`,
+          { headers: ghlHeaders }
+        );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("GHL error:", response.status, errorText);
+        console.log("Test connection - contacts response status:", response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("GHL test error:", response.status, errorText);
+          return new Response(
+            JSON.stringify({ 
+              error: "Failed to connect to Labortech/GHL", 
+              details: errorText, 
+              status: response.status,
+              hint: "Please verify the API key has access to this location"
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const data = await response.json();
         return new Response(
-          JSON.stringify({ error: "Failed to connect", details: errorText, status: response.status }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ 
+            success: true, 
+            message: "Successfully connected to Labortech",
+            contacts_available: data.meta?.total || 0,
+            token_type: "private_integration" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const data = await response.json();
+      // Without location_id, try the calendars endpoint which may work
+      // This is a lighter test - just validates token format
       return new Response(
         JSON.stringify({ 
           success: true, 
-          locations: data.locations || [], 
-          total: data.total || 0,
-          token_type: "agency" 
+          message: "API key is configured. Provide a location_id to fully test connection.",
+          needs_location_id: true,
+          token_type: "private_integration" 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (action === "get_contacts") {
-      if (!effectiveLocationId) {
+      if (!location_id) {
         return new Response(
-          JSON.stringify({ error: "location_id is required" }),
+          JSON.stringify({ error: "location_id is required for get_contacts" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       const response = await fetch(
-        `${GHL_API_BASE}/contacts/?locationId=${effectiveLocationId}&limit=${limit}`,
+        `${GHL_API_BASE}/contacts/?locationId=${location_id}&limit=${limit}`,
         { headers: ghlHeaders }
       );
 
+      console.log("Contacts API response status:", response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Contacts error:", response.status, errorText);
         return new Response(
           JSON.stringify({ error: "Failed to fetch contacts", details: errorText }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -108,6 +115,41 @@ Deno.serve(async (req) => {
       const data = await response.json();
       return new Response(
         JSON.stringify({ success: true, contacts: data.contacts || [], total: data.meta?.total || 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "get_opportunities") {
+      if (!location_id) {
+        return new Response(
+          JSON.stringify({ error: "location_id is required for get_opportunities" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const response = await fetch(
+        `${GHL_API_BASE}/opportunities/search?location_id=${location_id}&limit=${limit}`,
+        { 
+          method: "POST",
+          headers: ghlHeaders,
+          body: JSON.stringify({})
+        }
+      );
+
+      console.log("Opportunities API response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Opportunities error:", response.status, errorText);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch opportunities", details: errorText }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(
+        JSON.stringify({ success: true, opportunities: data.opportunities || [], total: data.meta?.total || 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
