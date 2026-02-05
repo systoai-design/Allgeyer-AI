@@ -1,144 +1,153 @@
 
 
-## Problem Analysis
+# PETE CRM Browser Automation Integration
 
-### Issue 1: KPI Data Only Shows for "Last 30 Days" but Not "Last Quarter"
-The root cause is that KPI data is stored with **specific period_start/period_end dates** based on when the bot was run. Looking at the database:
-- All KPI records have `period_start: 2026-02-03` and `period_end: 2026-02-04` (yesterday to today)
-- When you select "Last Quarter" (Oct-Dec 2025), the dashboard queries for KPIs where `period_end` falls within that range
-- Since all data was generated today with today's period_end, no data appears for historical ranges
+## Overview
 
-### Issue 2: No Automated Bot Runs
-Currently:
-- Bot schedules exist in the database (e.g., daily at 8:00 AM)
-- But there's no cron job or scheduler actually triggering the bots automatically
-- Bots only run when manually triggered from the Bot Runs page
+Since PETE CRM (app.thepete.io) has no API and CSV export isn't viable, we'll implement browser automation using **Browserless.io** - a cloud-based headless browser service that can handle authenticated sessions, cookies, and JavaScript-heavy SPAs.
 
-### Issue 3: Missing "Run Bot" Button on Dashboard
-Users have to navigate to the Bot Runs page to trigger bots manually.
+## Architecture
 
----
+```text
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   Dashboard     │────▶│  run-pete-scraper    │────▶│  Browserless    │
+│   (Frontend)    │     │  (Edge Function)     │     │  API Service    │
+└─────────────────┘     └──────────────────────┘     └────────┬────────┘
+                                 │                            │
+                                 │                            ▼
+                                 │                   ┌─────────────────┐
+                                 │                   │  app.thepete.io │
+                                 │                   │  (Login & Scrape)│
+                                 ▼                   └─────────────────┘
+                        ┌──────────────────────┐
+                        │   kpi_history table  │
+                        │   (Supabase DB)      │
+                        └──────────────────────┘
+```
 
-## Proposed Solution
+## Implementation Steps
 
-### Part 1: Add "Run Bot" Button to Dashboard
-Add a quick-action button on the dashboard to trigger bot runs without leaving the page. This provides immediate feedback and convenience.
+### 1. Add Browserless Connector/Secret
+Request the user to sign up for Browserless (free tier: 1k units/month) and provide their API token.
 
-**Changes:**
-- Add a "Sync Data" button next to the date picker that triggers both Financial Control and CRM bots
-- Show a loading state while bots are running
-- Refresh dashboard data after bots complete
+### 2. Create New Edge Function: `run-pete-scraper`
+This function will:
+- Connect to Browserless API with the user's token
+- Use BrowserQL or Puppeteer-over-WebSocket to:
+  1. Navigate to app.thepete.io login page
+  2. Inject saved session cookies OR perform login with stored credentials
+  3. Navigate to the dashboard/analytics pages
+  4. Extract KPI data using CSS selectors
+  5. Return structured data
 
-### Part 2: Fix KPI Storage to Support Date Ranges
-Modify the Financial Control and CRM bots to store KPIs with period dates that match the actual data being fetched, not just the cadence period. This allows historical queries to work correctly.
+### 3. Secure Credential Storage
+Add secrets for PETE credentials:
+- `PETE_EMAIL` - Login email
+- `PETE_PASSWORD` - Login password  
+- `BROWSERLESS_API_KEY` - Browserless token
 
-**Key insight:** Currently the bot calculates `period_start` and `period_end` based on cadence (daily = yesterday to today). Instead, we should:
-1. When triggered manually from dashboard, use the selected date range
-2. Support a "full sync" option that backfills historical data
+### 4. Update run-crm-bot
+Modify the existing CRM bot to call `run-pete-scraper` when company_type is `property_halo`.
 
-### Part 3: Set Up Automated Cron Jobs
-Create a cron job that automatically triggers bot runs on schedule using the pg_cron extension.
-
----
-
-## Implementation Plan
-
-### Step 1: Add "Sync Data" Button to Dashboard
-
-Add to `src/pages/Dashboard.tsx`:
-- Import necessary functions and state
-- Add `isSyncing` state and `handleSyncData` function
-- Add a "Sync Data" button next to the Export button
-- Button triggers both Financial Control and CRM bots for the selected company
-- Shows toast notifications for progress
-- Auto-refreshes dashboard data after completion
-
-### Step 2: Update Edge Functions to Accept Date Range Parameters
-
-Modify `supabase/functions/run-financial-control-bot/index.ts`:
-- Accept optional `period_start` and `period_end` parameters
-- If provided, use those dates instead of calculating from cadence
-- This allows the dashboard to request data for specific date ranges
-
-Modify `supabase/functions/run-crm-bot/index.ts`:
-- Same changes to accept date range parameters
-
-### Step 3: Add Historical Data Backfill Capability
-
-Create a "Full Sync" option that:
-- Fetches data for the last 3-6 months from QuickBooks/Jobber
-- Stores KPIs with appropriate period dates
-- Enables historical date range queries to show real data
-
-### Step 4: Set Up Automated Cron Scheduling
-
-Create a database cron job using pg_cron:
-- Schedule daily bot runs at 8:00 AM for each company with active schedules
-- This runs automatically without manual intervention
+### 5. KPI Extraction Targets
+Based on Property Halo's defined KPIs, scrape:
+- **Daily**: Leads, Appointments, Calls Made, Completed Deals
+- **Weekly**: Contracts in Pipeline, Pipeline Value, Under Contract, Upcoming Closings
+- **Monthly**: Assets Bought, Assets Sold, Under Contract, Closings, Completed Deals
+- **Quarterly**: ROI, Capital Deployed, Portfolio Valuation
 
 ---
 
 ## Technical Details
 
-### Dashboard Sync Button Implementation
+### Browserless Integration Code Pattern
 
-```text
-Location: src/pages/Dashboard.tsx
+```typescript
+// Edge function will use Browserless REST API
+const BROWSERLESS_URL = 'https://production-sfo.browserless.io';
 
-New State:
-- isSyncing: boolean
-- syncProgress: string
-
-New Function: handleSyncData()
-1. Set isSyncing = true
-2. Get Financial Control bot ID and CRM bot ID for company
-3. Create bot_runs records for both
-4. Call edge functions for both in parallel
-5. Wait for completion
-6. Refresh dashboard data
-7. Set isSyncing = false
-8. Show success toast
-```
-
-### Edge Function Date Range Support
-
-```text
-Request Body Changes:
-{
-  bot_run_id: string,
-  company_id: string,
-  cadence: string,
-  period_start?: string,  // NEW: Optional override
-  period_end?: string     // NEW: Optional override
+async function scrapePete(browserlessToken: string, credentials: { email: string; password: string }) {
+  // Step 1: Create a session for cookie persistence
+  const sessionResponse = await fetch(
+    `${BROWSERLESS_URL}/session?token=${browserlessToken}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ttl: 300000, // 5 minute session
+        stealth: true, // Anti-bot detection
+      }),
+    }
+  );
+  
+  // Step 2: Use BrowserQL to login and scrape
+  const scrapeResponse = await fetch(
+    `${BROWSERLESS_URL}/chromium/bql?token=${browserlessToken}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `
+          mutation {
+            goto(url: "https://app.thepete.io/login")
+            type(selector: "input[name='email']", text: "${credentials.email}")
+            type(selector: "input[name='password']", text: "${credentials.password}")
+            click(selector: "button[type='submit']")
+            waitForNavigation
+            goto(url: "https://app.thepete.io/dashboard")
+            waitForSelector(selector: ".kpi-container")
+            text(selector: ".leads-count") { value }
+            text(selector: ".pipeline-value") { value }
+          }
+        `
+      }),
+    }
+  );
+  
+  return scrapeResponse.json();
 }
-
-If period_start/period_end provided:
-- Use those dates for fetching QBO/Jobber data
-- Store KPIs with those period dates
-
-If not provided:
-- Fall back to current cadence-based calculation
 ```
 
-### Cron Job Setup
+### Session Persistence Strategy
+- First run: Login with credentials, save cookies
+- Subsequent runs: Inject cookies to skip login
+- If cookies expired: Re-login automatically
 
-```text
-SQL to execute:
-
-1. Enable pg_cron and pg_net extensions
-2. Schedule a job that:
-   - Runs every hour
-   - Checks bot_schedules for any due runs
-   - Triggers the appropriate edge functions
-```
+### Error Handling
+- CAPTCHA detection: Alert user to manually login and retry
+- MFA: Store TOTP secret if PETE supports it, or fallback to manual
+- Rate limiting: Implement exponential backoff
 
 ---
 
-## Expected Outcome
+## Cost Estimate
+- **Browserless Free Tier**: 1,000 units/month
+- Each scrape session: ~10-20 units
+- Estimated monthly syncs: 30-60 (daily syncs)
+- **Result**: Free tier should cover basic usage
 
-After implementation:
-1. Users can click "Sync Data" on the dashboard to immediately fetch latest data
-2. Historical date ranges will show data once a backfill sync is run
-3. Bots will run automatically on their configured schedules
-4. Data will accumulate over time, making all date range views useful
+For heavier usage, Prototyping tier ($25/month) provides 20k units.
+
+---
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| PETE UI changes break selectors | Build selector mapping config, easy to update |
+| CAPTCHA challenges | Browserless includes automatic CAPTCHA solving |
+| Session timeouts | Re-login flow with fresh credentials |
+| Rate limiting by PETE | Throttle requests, respect robots.txt |
+
+---
+
+## Questions Before Implementation
+
+1. **Do you have a Browserless account?** If not, you'll need to sign up at browserless.io (free tier available)
+
+2. **What are your PETE login credentials?** (Email/password) - I'll store these securely as secrets
+
+3. **Does PETE have 2FA/MFA enabled?** This affects the login flow
+
+4. **What specific dashboard pages in PETE contain the KPI data you need?** (e.g., /dashboard, /reports, /analytics)
 
