@@ -32,48 +32,53 @@ interface ScrapeResult {
   rawData?: unknown;
 }
 
+function parseSessionCookies(cookieString: string): Array<{ name: string; value: string; domain: string }> {
+  const cookies: Array<{ name: string; value: string; domain: string }> = [];
+  const pairs = cookieString.split(";").map((s) => s.trim()).filter(Boolean);
+  
+  for (const pair of pairs) {
+    const eqIndex = pair.indexOf("=");
+    if (eqIndex > 0) {
+      cookies.push({
+        name: pair.substring(0, eqIndex).trim(),
+        value: pair.substring(eqIndex + 1).trim(),
+        domain: "app.thepete.io",
+      });
+    }
+  }
+  
+  return cookies;
+}
+
 async function scrapePeteDashboard(
   browserlessToken: string,
-  email: string,
-  password: string
+  sessionCookies: string
 ): Promise<ScrapeResult> {
-  console.log("[PETE Scraper] Starting browser automation...");
+  console.log("[PETE Scraper] Starting browser automation with session cookies...");
 
-  // BrowserQL mutation to login and extract dashboard data
+  // Parse the session cookies
+  const cookies = parseSessionCookies(sessionCookies);
+  console.log(`[PETE Scraper] Parsed ${cookies.length} cookies`);
+
+  if (cookies.length === 0) {
+    return {
+      success: false,
+      kpis: {},
+      error: "No valid session cookies found. Please update PETE_SESSION_COOKIES secret.",
+    };
+  }
+
+  // BrowserQL mutation to navigate directly to dashboard using session cookies
   const bqlQuery = `
     mutation ScrapeKpis {
-      goto(url: "https://app.thepete.io/login", waitUntil: networkIdle) {
+      # Navigate directly to dashboard (cookies will authenticate us)
+      goto(url: "https://app.thepete.io/dashboard", waitUntil: networkIdle) {
         status
         url
       }
       
-      # Wait for login form
-      loginForm: waitForSelector(selector: "form", timeout: 10000) {
-        selector
-      }
-      
-      # Fill email
-      emailInput: type(selector: "input[type='email'], input[name='email'], input[id*='email']", text: "${email}") {
-        selector
-      }
-      
-      # Fill password
-      passwordInput: type(selector: "input[type='password'], input[name='password']", text: "${password}") {
-        selector
-      }
-      
-      # Click submit
-      submitBtn: click(selector: "button[type='submit'], input[type='submit'], button:contains('Login'), button:contains('Sign In')") {
-        selector
-      }
-      
-      # Wait for navigation after login
-      waitNav: waitForNavigation(timeout: 30000) {
-        url
-      }
-      
-      # Wait for dashboard to load
-      dashboardWait: waitForSelector(selector: "body", timeout: 15000) {
+      # Wait for page to load
+      pageWait: waitForSelector(selector: "body", timeout: 20000) {
         selector
       }
       
@@ -90,7 +95,7 @@ async function scrapePeteDashboard(
   `;
 
   try {
-    console.log("[PETE Scraper] Sending request to Browserless...");
+    console.log("[PETE Scraper] Sending request to Browserless with cookies...");
     
     const response = await fetch(
       `${BROWSERLESS_URL}/chromium/bql?token=${browserlessToken}&stealth=true`,
@@ -99,6 +104,7 @@ async function scrapePeteDashboard(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: bqlQuery,
+          cookies: cookies,
         }),
       }
     );
@@ -115,28 +121,41 @@ async function scrapePeteDashboard(
 
     const result = await response.json();
     console.log("[PETE Scraper] Raw response received");
+    
+    const currentUrl = result?.data?.goto?.url || "";
+    console.log("[PETE Scraper] Current URL after navigation:", currentUrl);
 
-    // Check for 2FA/MFA prompt
-    const pageContent = result?.data?.pageContent?.text || "";
-    if (
-      pageContent.toLowerCase().includes("verification code") ||
-      pageContent.toLowerCase().includes("two-factor") ||
-      pageContent.toLowerCase().includes("2fa") ||
-      pageContent.toLowerCase().includes("verify your identity")
-    ) {
-      console.log("[PETE Scraper] 2FA detected - manual intervention required");
+    // Check if we were redirected to login (session expired)
+    if (currentUrl.includes("/login") || currentUrl.includes("/signin")) {
+      console.log("[PETE Scraper] Session expired - redirected to login");
       return {
         success: false,
         kpis: {},
-        error: "2FA/MFA detected. Please log in manually and provide session cookies.",
+        error: "Session cookies expired. Please log in again and update PETE_SESSION_COOKIES secret with fresh cookies.",
+        rawData: result,
+      };
+    }
+
+    // Extract page content
+    const pageContent = result?.data?.pageContent?.text || "";
+    
+    // Check for login/auth keywords that indicate we're not authenticated
+    if (
+      pageContent.toLowerCase().includes("sign in") ||
+      pageContent.toLowerCase().includes("log in") ||
+      pageContent.toLowerCase().includes("enter your email")
+    ) {
+      console.log("[PETE Scraper] Not authenticated - session may be invalid");
+      return {
+        success: false,
+        kpis: {},
+        error: "Session cookies appear invalid or expired. Please update PETE_SESSION_COOKIES with fresh cookies.",
         rawData: result,
       };
     }
 
     // Parse KPIs from page content
-    // These selectors will need to be adjusted based on actual PETE dashboard structure
     const kpis = parseKpisFromContent(pageContent);
-
     console.log("[PETE Scraper] Extracted KPIs:", kpis);
 
     return {
@@ -202,17 +221,13 @@ Deno.serve(async (req) => {
   try {
     // Get secrets
     const browserlessToken = Deno.env.get("BROWSERLESS_API_KEY");
-    const peteEmail = Deno.env.get("PETE_EMAIL");
-    const petePassword = Deno.env.get("PETE_PASSWORD");
+    const sessionCookies = Deno.env.get("PETE_SESSION_COOKIES");
 
     if (!browserlessToken) {
       throw new Error("BROWSERLESS_API_KEY is not configured");
     }
-    if (!peteEmail) {
-      throw new Error("PETE_EMAIL is not configured");
-    }
-    if (!petePassword) {
-      throw new Error("PETE_PASSWORD is not configured");
+    if (!sessionCookies) {
+      throw new Error("PETE_SESSION_COOKIES is not configured. Please log in to PETE and export your session cookies.");
     }
 
     // Parse request body
@@ -225,8 +240,8 @@ Deno.serve(async (req) => {
 
     console.log(`[PETE Scraper] Starting scrape for company ${company_id}, cadence: ${cadence}`);
 
-    // Run the scraper
-    const result = await scrapePeteDashboard(browserlessToken, peteEmail, petePassword);
+    // Run the scraper with session cookies
+    const result = await scrapePeteDashboard(browserlessToken, sessionCookies);
 
     if (!result.success) {
       console.error("[PETE Scraper] Scrape failed:", result.error);
