@@ -503,110 +503,112 @@ function SettingsContent() {
         </div>
       </div>
 
-      {/* Jobber Integration Card */}
-      <div id="jobber-integration-card" className="rounded-2xl border border-border/50 bg-card">
-        <div className="p-5 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#7AC142]/10">
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#7AC142">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-base font-semibold">Jobber</h2>
-                <p className="text-sm text-muted-foreground">Jobs, clients & invoices</p>
-              </div>
-            </div>
-            {isJobberConnected ? (
-              <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
-                <CheckCircle2 className="mr-1 h-3 w-3" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
-                <XCircle className="mr-1 h-3 w-3" />
-                Not Connected
-              </Badge>
-            )}
-          </div>
-        </div>
-        <div className="p-5">
-          {selectedCompany ? (
-            <>
-              <div className="rounded-xl bg-muted/40 p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Company</p>
-                    <p className="text-base font-semibold">{selectedCompany.name}</p>
-                  </div>
-                  {isJobberConnected && jobberIntegration?.last_sync_at && (
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Last Sync</p>
-                      <p className="text-sm font-medium">
-                        {new Date(jobberIntegration.last_sync_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
+      {/* Jobber Integration Card - Show only for Unique Painting and ATI Security */}
+      {(selectedCompany?.company_type === 'unique_painting' || selectedCompany?.company_type === 'ati_security') && (
+        <div id="jobber-integration-card" className="rounded-2xl border border-border/50 bg-card">
+          <div className="p-5 border-b border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#7AC142]/10">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#7AC142">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Jobber</h2>
+                  <p className="text-sm text-muted-foreground">Jobs, clients & invoices</p>
                 </div>
               </div>
-
               {isJobberConnected ? (
-                <div className="flex gap-2">
+                <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
+                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
+                  <XCircle className="mr-1 h-3 w-3" />
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="p-5">
+            {selectedCompany ? (
+              <>
+                <div className="rounded-xl bg-muted/40 p-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Company</p>
+                      <p className="text-base font-semibold">{selectedCompany.name}</p>
+                    </div>
+                    {isJobberConnected && jobberIntegration?.last_sync_at && (
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Last Sync</p>
+                        <p className="text-sm font-medium">
+                          {new Date(jobberIntegration.last_sync_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isJobberConnected ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 rounded-full"
+                      onClick={handleSyncJobber}
+                      disabled={syncingJobber}
+                    >
+                      {syncingJobber ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Sync Now
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={() => jobberIntegration && handleDisconnectJobber(jobberIntegration.id)}
+                      disabled={syncingJobber}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                ) : (
                   <Button
-                    variant="outline"
-                    className="flex-1 rounded-full"
-                    onClick={handleSyncJobber}
-                    disabled={syncingJobber}
+                    className="w-full rounded-full bg-[#7AC142] hover:bg-[#6ab038] text-white"
+                    onClick={handleConnectJobber}
+                    disabled={connectingJobber || loadingIntegrations}
                   >
-                    {syncingJobber ? (
+                    {connectingJobber ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing...
+                        Connecting...
                       </>
                     ) : (
                       <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Sync Now
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Connect to Jobber
                       </>
                     )}
                   </Button>
-                  <Button
-                    variant="destructive"
-                    className="rounded-full"
-                    onClick={() => jobberIntegration && handleDisconnectJobber(jobberIntegration.id)}
-                    disabled={syncingJobber}
-                  >
-                    Disconnect
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  className="w-full rounded-full bg-[#7AC142] hover:bg-[#6ab038] text-white"
-                  onClick={handleConnectJobber}
-                  disabled={connectingJobber || loadingIntegrations}
-                >
-                  {connectingJobber ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="mr-2 h-4 w-4" />
-                      Connect to Jobber
-                    </>
-                  )}
-                </Button>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <p>Please select a company from the sidebar to manage integrations.</p>
-            </div>
-          )}
+                )}
+              </>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                <p>Please select a company from the sidebar to manage integrations.</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* PETE CRM Integration Card - Show only for Property Halo */}
       {selectedCompany?.company_type === 'property_halo' && (
