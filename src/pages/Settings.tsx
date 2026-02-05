@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Integration } from '@/types/database';
 import { CompanyIntegrationStatus } from '@/components/settings/CompanyIntegrationStatus';
+import { LabortechLocationDialog } from '@/components/settings/LabortechLocationDialog';
 
 function SettingsContent() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ function SettingsContent() {
   const [syncingPete, setSyncingPete] = useState(false);
   const [syncingLabortech, setSyncingLabortech] = useState(false);
   const [testingLabortech, setTestingLabortech] = useState(false);
+  const [labortechDialogOpen, setLabortechDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -383,7 +385,7 @@ function SettingsContent() {
     }
   };
 
-  const handleTestLabortech = async () => {
+  const handleConnectLabortech = async (locationId: string) => {
     if (!selectedCompany) {
       toast.error('Please select a company first');
       return;
@@ -401,6 +403,7 @@ function SettingsContent() {
           body: JSON.stringify({
             company_id: selectedCompany.id,
             action: 'test_connection',
+            location_id: locationId,
           }),
         }
       );
@@ -421,9 +424,9 @@ function SettingsContent() {
             is_connected: true, 
             last_sync_at: new Date().toISOString(),
             config: {
-              ...(existingIntegration.config || {}),
+              location_id: locationId,
               token_type: result.token_type,
-              locations: result.locations,
+              contacts_available: result.contacts_available,
             }
           })
           .eq('id', existingIntegration.id);
@@ -436,8 +439,9 @@ function SettingsContent() {
             is_connected: true,
             last_sync_at: new Date().toISOString(),
             config: {
+              location_id: locationId,
               token_type: result.token_type,
-              locations: result.locations,
+              contacts_available: result.contacts_available,
             }
           });
       }
@@ -452,13 +456,14 @@ function SettingsContent() {
         setIntegrations(updatedIntegrations as Integration[]);
       }
 
-      const locationCount = result.locations?.length || 0;
+      const contactCount = result.contacts_available || 0;
       toast.success(
-        `Labortech connected! Found ${locationCount} location${locationCount !== 1 ? 's' : ''}`
+        `Labortech connected! Found ${contactCount} contacts available`
       );
     } catch (error) {
-      console.error('Error testing Labortech:', error);
+      console.error('Error connecting Labortech:', error);
       toast.error(`Failed to connect Labortech: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error; // Re-throw so dialog knows connection failed
     } finally {
       setTestingLabortech(false);
     }
@@ -944,20 +949,11 @@ function SettingsContent() {
                 ) : (
                   <Button
                     className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white"
-                    onClick={handleTestLabortech}
+                    onClick={() => setLabortechDialogOpen(true)}
                     disabled={testingLabortech || loadingIntegrations}
                   >
-                    {testingLabortech ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="mr-2 h-4 w-4" />
-                        Connect to Labortech
-                      </>
-                    )}
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Connect to Labortech
                   </Button>
                 )}
               </>
@@ -996,6 +992,14 @@ function SettingsContent() {
           </div>
         </div>
       </div>
+
+      {/* Labortech Location Dialog */}
+      <LabortechLocationDialog
+        open={labortechDialogOpen}
+        onOpenChange={setLabortechDialogOpen}
+        onConnect={handleConnectLabortech}
+        connecting={testingLabortech}
+      />
     </div>
   );
 }
