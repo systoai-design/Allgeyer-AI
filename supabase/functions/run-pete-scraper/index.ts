@@ -68,10 +68,26 @@ async function scrapePeteDashboard(
     };
   }
 
-  // BrowserQL mutation to navigate directly to dashboard using session cookies
+  // Build cookies array for BQL
+  const cookiesInput = cookies.map((cookie) => ({
+    name: cookie.name,
+    value: cookie.value,
+    domain: ".thepete.io",
+    path: "/",
+  }));
+
+  // BrowserQL mutation to set cookies, then navigate to dashboard
   const bqlQuery = `
-    mutation ScrapeKpis {
-      # Navigate directly to dashboard (cookies will authenticate us)
+    mutation ScrapeKpis($cookies: [CookieInput!]) {
+      # First set all cookies
+      setCookies: cookies(cookies: $cookies) {
+        cookies {
+          name
+          value
+        }
+      }
+      
+      # Navigate to dashboard (cookies will authenticate us)
       goto(url: "https://app.thepete.io/dashboard", waitUntil: networkIdle) {
         status
         url
@@ -95,7 +111,8 @@ async function scrapePeteDashboard(
   `;
 
   try {
-    console.log("[PETE Scraper] Sending request to Browserless with cookies...");
+    console.log("[PETE Scraper] Sending request to Browserless...");
+    console.log("[PETE Scraper] BQL Query:", bqlQuery.substring(0, 500) + "...");
     
     const response = await fetch(
       `${BROWSERLESS_URL}/chromium/bql?token=${browserlessToken}&stealth=true`,
@@ -104,7 +121,9 @@ async function scrapePeteDashboard(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: bqlQuery,
-          cookies: cookies,
+          variables: {
+            cookies: cookiesInput,
+          },
         }),
       }
     );
@@ -121,6 +140,18 @@ async function scrapePeteDashboard(
 
     const result = await response.json();
     console.log("[PETE Scraper] Raw response received");
+    console.log("[PETE Scraper] Full response:", JSON.stringify(result, null, 2).substring(0, 2000));
+    
+    // Check for BQL errors
+    if (result.errors && result.errors.length > 0) {
+      console.error("[PETE Scraper] BQL errors:", JSON.stringify(result.errors));
+      return {
+        success: false,
+        kpis: {},
+        error: `BQL execution error: ${result.errors.map((e: { message: string }) => e.message).join(", ")}`,
+        rawData: result,
+      };
+    }
     
     const currentUrl = result?.data?.goto?.url || "";
     console.log("[PETE Scraper] Current URL after navigation:", currentUrl);
