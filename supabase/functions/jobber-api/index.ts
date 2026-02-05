@@ -1,88 +1,70 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
-const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
-
-interface JobberTokens {
-  access_token: string;
-  refresh_token: string;
-  token_expires_at: string;
-}
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const body = await req.json();
+    const { company_id, query, variables } = body;
+
+    console.log(`Jobber API: company=${company_id}`);
+
+    if (!company_id || !query) {
+      return new Response(
+        JSON.stringify({ error: 'company_id and query are required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const clientId = Deno.env.get('JOBBER_CLIENT_ID');
     const clientSecret = Deno.env.get('JOBBER_CLIENT_SECRET');
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Fetch integration directly via REST
+    const intResponse = await fetch(
+      `${supabaseUrl}/rest/v1/integrations?company_id=eq.${company_id}&integration_type=eq.jobber&select=*`,
+      {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+      }
+    );
 
-    // Parse request
-    const { company_id, query, variables = {} } = await req.json();
+    const integrations = await intResponse.json();
+    const integration = integrations?.[0];
 
-    if (!company_id) {
-      return new Response(
-        JSON.stringify({ error: 'company_id is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
-    if (!query) {
-      return new Response(
-        JSON.stringify({ error: 'GraphQL query is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
-    // Get integration credentials
-    const { data: integration, error: intError } = await supabase
-      .from('integrations')
-      .select('*')
-      .eq('company_id', company_id)
-      .eq('integration_type', 'jobber')
-      .single();
-
-    if (intError || !integration) {
-      console.error('Jobber integration not found:', intError);
+    if (!integration) {
       return new Response(
         JSON.stringify({ error: 'Jobber not connected for this company' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
     }
 
-    const config = integration.config as JobberTokens;
-    if (!config.access_token) {
+    const config = integration.config;
+    if (!config?.access_token) {
       return new Response(
         JSON.stringify({ error: 'Invalid Jobber configuration' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    // Check if token needs refresh
     let accessToken = config.access_token;
     const tokenExpiresAt = new Date(config.token_expires_at);
-    const now = new Date();
     
-    // Refresh if token expires within 5 minutes
-    if (now >= new Date(tokenExpiresAt.getTime() - 5 * 60 * 1000)) {
-      console.log('Jobber token expired or expiring soon, refreshing...');
+    // Refresh token if expired
+    if (new Date() >= new Date(tokenExpiresAt.getTime() - 5 * 60 * 1000)) {
+      console.log('Refreshing Jobber token...');
       
-      const tokenResponse = await fetch(JOBBER_TOKEN_URL, {
+      const tokenResponse = await fetch("https://api.getjobber.com/api/oauth/token", {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           client_id: clientId!,
@@ -91,100 +73,95 @@ serve(async (req) => {
         }),
       });
 
-      const tokens = await tokenResponse.json();
-
       if (!tokenResponse.ok) {
-        console.error('Jobber token refresh failed:', tokens);
-        
-        // Mark integration as disconnected
-        await supabase
-          .from('integrations')
-          .update({ is_connected: false })
-          .eq('id', integration.id);
-
+        // Mark as disconnected
+        await fetch(
+          `${supabaseUrl}/rest/v1/integrations?id=eq.${integration.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabaseServiceKey,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_connected: false }),
+          }
+        );
         return new Response(
           JSON.stringify({ error: 'Token refresh failed. Please reconnect Jobber.' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
         );
       }
 
-      // Update stored tokens
+      const tokens = await tokenResponse.json();
       accessToken = tokens.access_token;
-      const expiresIn = tokens.expires_in || 7200;
       
-      await supabase
-        .from('integrations')
-        .update({
-          config: {
-            ...config,
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
-            token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      // Update tokens
+      await fetch(
+        `${supabaseUrl}/rest/v1/integrations?id=eq.${integration.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
           },
-          last_sync_at: new Date().toISOString(),
-        })
-        .eq('id', integration.id);
-
-      console.log('Jobber token refreshed successfully');
+          body: JSON.stringify({
+            config: {
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token,
+              token_expires_at: new Date(Date.now() + (tokens.expires_in || 7200) * 1000).toISOString(),
+            },
+          }),
+        }
+      );
+      console.log('Jobber token refreshed');
     }
 
-    // Make Jobber GraphQL API request
-    console.log('Making Jobber GraphQL request...');
-
-    const jobberResponse = await fetch(JOBBER_GRAPHQL_URL, {
+    // Make GraphQL request
+    const jobberResponse = await fetch("https://api.getjobber.com/api/graphql", {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
         'X-JOBBER-GRAPHQL-VERSION': '2023-08-18',
       },
-      body: JSON.stringify({ query, variables }),
+      body: JSON.stringify({ query, variables: variables || {} }),
     });
 
     const data = await jobberResponse.json();
 
-    if (!jobberResponse.ok) {
+    if (!jobberResponse.ok || data.errors) {
       console.error('Jobber API error:', data);
       return new Response(
-        JSON.stringify({ 
-          error: 'Jobber API error', 
-          details: data,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: jobberResponse.status }
-      );
-    }
-
-    // Check for GraphQL errors
-    if (data.errors && data.errors.length > 0) {
-      console.error('Jobber GraphQL errors:', data.errors);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Jobber GraphQL error', 
-          details: data.errors,
-        }),
+        JSON.stringify({ error: 'Jobber API error', details: data.errors || data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    // Update last sync time
-    await supabase
-      .from('integrations')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', integration.id);
-
-    console.log('Jobber API request successful');
+    // Update last sync
+    await fetch(
+      `${supabaseUrl}/rest/v1/integrations?id=eq.${integration.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ last_sync_at: new Date().toISOString() }),
+      }
+    );
 
     return new Response(
       JSON.stringify({ data: data.data }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Jobber API error:', errorMessage);
+  } catch (error) {
+    console.error('Jobber API error:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

@@ -643,7 +643,34 @@ function SettingsContent() {
                   <Button
                     variant="outline"
                     className="flex-1 rounded-full"
-                    onClick={() => toast.info('Sync functionality coming soon')}
+                    onClick={async () => {
+                      if (!selectedCompany) return;
+                      toast.info('Running Financial Control bot to sync QuickBooks data...');
+                      try {
+                        const response = await fetch(
+                          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-financial-control-bot`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              company_id: selectedCompany.id,
+                              cadence: 'daily',
+                            }),
+                          }
+                        );
+                        const result = await response.json();
+                        if (result.success) {
+                          toast.success('QuickBooks data synced successfully!');
+                          // Refresh integrations
+                          const { data } = await supabase.from('integrations').select('*').eq('company_id', selectedCompany.id);
+                          if (data) setIntegrations(data as Integration[]);
+                        } else {
+                          throw new Error(result.error || 'Sync failed');
+                        }
+                      } catch (error) {
+                        toast.error(`Failed to sync: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                      }
+                    }}
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Sync Now
