@@ -169,6 +169,8 @@ async function scrapePeteDashboard(
 
     // Extract page content
     const pageContent = result?.data?.pageContent?.text || "";
+    console.log("[PETE Scraper] Page content length:", pageContent.length);
+    console.log("[PETE Scraper] Page content preview (first 2000 chars):", pageContent.substring(0, 2000));
     
     // Check for login/auth keywords that indicate we're not authenticated
     if (
@@ -207,38 +209,97 @@ async function scrapePeteDashboard(
 function parseKpisFromContent(content: string): ScrapedKpis {
   const kpis: ScrapedKpis = {};
 
-  // Helper to extract numbers near keywords
-  const extractNumber = (text: string, keywords: string[]): number | undefined => {
+  // Helper to extract numbers - handles patterns like "Leads\nToday\n2" or "Calls\n791"
+  const extractAfterKeyword = (text: string, keywords: string[]): number | undefined => {
     for (const keyword of keywords) {
-      const regex = new RegExp(
-        `${keyword}[:\\s]*[$]?([\\d,]+(?:\\.\\d+)?)|([\\d,]+(?:\\.\\d+)?)[\\s]*${keyword}`,
+      // Pattern 1: "Keyword\n...\nNumber" (PETE format with time period)
+      const multilineRegex = new RegExp(
+        `${keyword}\\s*\\n[^\\d]*?\\n\\s*([\\d,]+)`,
         "i"
       );
-      const match = text.match(regex);
-      if (match) {
-        const numStr = (match[1] || match[2]).replace(/,/g, "");
-        const num = parseFloat(numStr);
+      const multilineMatch = text.match(multilineRegex);
+      if (multilineMatch) {
+        const num = parseFloat(multilineMatch[1].replace(/,/g, ""));
+        if (!isNaN(num)) return num;
+      }
+
+      // Pattern 2: "Keyword\nNumber" (direct)
+      const directRegex = new RegExp(
+        `${keyword}\\s*\\n\\s*([\\d,]+)`,
+        "i"
+      );
+      const directMatch = text.match(directRegex);
+      if (directMatch) {
+        const num = parseFloat(directMatch[1].replace(/,/g, ""));
+        if (!isNaN(num)) return num;
+      }
+
+      // Pattern 3: "Keyword: Number" or "Keyword Number"
+      const inlineRegex = new RegExp(
+        `${keyword}[:\\s]+[$]?([\\d,]+(?:\\.\\d+)?)`,
+        "i"
+      );
+      const inlineMatch = text.match(inlineRegex);
+      if (inlineMatch) {
+        const num = parseFloat(inlineMatch[1].replace(/,/g, ""));
         if (!isNaN(num)) return num;
       }
     }
     return undefined;
   };
 
-  // Extract each KPI
-  kpis.leads = extractNumber(content, ["leads", "new leads", "lead count"]);
-  kpis.appointments = extractNumber(content, ["appointments", "appts", "scheduled"]);
-  kpis.calls = extractNumber(content, ["calls", "calls made", "phone calls"]);
-  kpis.completed_deals = extractNumber(content, ["completed deals", "closed deals", "deals closed"]);
-  kpis.contracts_in_pipeline = extractNumber(content, ["contracts in pipeline", "pipeline contracts", "active contracts"]);
-  kpis.pipeline_value = extractNumber(content, ["pipeline value", "pipeline $", "total pipeline"]);
-  kpis.under_contract = extractNumber(content, ["under contract", "contracted"]);
-  kpis.upcoming_closings = extractNumber(content, ["upcoming closings", "pending closings", "closings scheduled"]);
-  kpis.assets_bought = extractNumber(content, ["assets bought", "properties purchased", "acquisitions"]);
-  kpis.assets_sold = extractNumber(content, ["assets sold", "properties sold", "dispositions"]);
-  kpis.closings = extractNumber(content, ["closings", "closed"]);
-  kpis.roi = extractNumber(content, ["roi", "return on investment"]);
-  kpis.capital_deployed = extractNumber(content, ["capital deployed", "invested capital"]);
-  kpis.portfolio_valuation = extractNumber(content, ["portfolio valuation", "portfolio value", "total valuation"]);
+  // PETE Dashboard specific extractions based on actual content structure
+  // "Leads\nToday\n2" - Extract leads from the "Leads Today" section
+  const leadsMatch = content.match(/Leads\s*\n\s*Today\s*\n\s*(\d+)/i);
+  if (leadsMatch) {
+    kpis.leads = parseInt(leadsMatch[1], 10);
+  }
+
+  // "Appointments\nThis Week\n0" - Appointments section
+  kpis.appointments = extractAfterKeyword(content, ["Appointments"]);
+
+  // "Calls\n791" - from Inbound Messages & Calls section
+  const callsMatch = content.match(/Calls\s*\n\s*([\d,]+)/i);
+  if (callsMatch) {
+    kpis.calls = parseInt(callsMatch[1].replace(/,/g, ""), 10);
+  }
+
+  // "New Contracts\nThis Week\n0"
+  const contractsMatch = content.match(/New Contracts\s*\n[^0-9]*\n\s*(\d+)/i);
+  if (contractsMatch) {
+    kpis.contracts_in_pipeline = parseInt(contractsMatch[1], 10);
+  }
+
+  // Messages (inbound + outbound)
+  const messagesMatch = content.match(/Messages\s*\n\s*([\d,]+)/i);
+  const outboundMatch = content.match(/Outbound Messages[\s\S]*?Count\s*\n\s*([\d,]+)/i);
+  
+  // Chester Leads (total leads added)
+  const chesterAllTimeMatch = content.match(/Chester(?:\s+Leads)?\s*\n\s*([\d,]+)/i);
+  const chesterMonthMatch = content.match(/Chester Leads Added Month\s*\n\s*([\d,]+)/i);
+  
+  // Auction Dates count
+  const auctionMatch = content.match(/Auction Dates[\s\S]*?Count\s*\n\s*([\d,]+)/i);
+  if (auctionMatch) {
+    kpis.upcoming_closings = parseInt(auctionMatch[1].replace(/,/g, ""), 10);
+  }
+
+  // Call Comp Ratio %
+  const callRatioMatch = content.match(/Call Comp Ratio[\s\S]*?Ratio Count\s*\n\s*([\d.]+)/i);
+  if (callRatioMatch) {
+    // This could be useful for tracking performance
+  }
+
+  // For other KPIs, use generic extraction
+  kpis.completed_deals = extractAfterKeyword(content, ["completed deals", "closed deals", "deals closed"]);
+  kpis.pipeline_value = extractAfterKeyword(content, ["pipeline value", "pipeline \\$", "total pipeline"]);
+  kpis.under_contract = extractAfterKeyword(content, ["under contract", "contracted"]);
+  kpis.assets_bought = extractAfterKeyword(content, ["assets bought", "properties purchased", "acquisitions"]);
+  kpis.assets_sold = extractAfterKeyword(content, ["assets sold", "properties sold", "dispositions"]);
+  kpis.closings = extractAfterKeyword(content, ["closings", "closed"]);
+  kpis.roi = extractAfterKeyword(content, ["roi", "return on investment"]);
+  kpis.capital_deployed = extractAfterKeyword(content, ["capital deployed", "invested capital"]);
+  kpis.portfolio_valuation = extractAfterKeyword(content, ["portfolio valuation", "portfolio value", "total valuation"]);
 
   return kpis;
 }

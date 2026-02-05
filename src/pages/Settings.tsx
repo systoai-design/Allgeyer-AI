@@ -21,6 +21,7 @@ function SettingsContent() {
   const [connectingQBO, setConnectingQBO] = useState(false);
   const [connectingJobber, setConnectingJobber] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
+  const [syncingPete, setSyncingPete] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -314,6 +315,69 @@ function SettingsContent() {
   const jobberIntegration = integrations.find(i => i.integration_type === 'jobber');
   const isJobberConnected = jobberIntegration?.is_connected;
 
+  const peteIntegration = integrations.find(i => i.integration_type === 'pete_crm');
+  const isPeteConnected = peteIntegration?.is_connected;
+
+  const handleSyncPete = async () => {
+    if (!selectedCompany) {
+      toast.error('Please select a company first');
+      return;
+    }
+
+    setSyncingPete(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/run-pete-scraper`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            company_id: selectedCompany.id,
+            cadence: 'daily',
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to sync PETE CRM');
+      }
+
+      // Update the last_sync_at timestamp
+      const { error: updateError } = await supabase
+        .from('integrations')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('company_id', selectedCompany.id)
+        .eq('integration_type', 'pete_crm');
+
+      if (updateError) {
+        console.error('Error updating sync timestamp:', updateError);
+      }
+
+      // Refresh integrations to show new sync time
+      const { data: updatedIntegrations } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('company_id', selectedCompany.id);
+
+      if (updatedIntegrations) {
+        setIntegrations(updatedIntegrations as Integration[]);
+      }
+
+      toast.success(
+        `PETE CRM sync successful! Extracted ${result.kpiCount} KPIs: ${Object.keys(result.kpis).join(', ')}`
+      );
+    } catch (error) {
+      console.error('Error syncing PETE:', error);
+      toast.error(`Failed to sync PETE CRM: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSyncingPete(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -544,7 +608,84 @@ function SettingsContent() {
         </div>
       </div>
 
-      {/* Other Integrations Card */}
+      {/* PETE CRM Integration Card - Show only for Property Halo */}
+      {selectedCompany?.company_type === 'property_halo' && (
+        <div id="pete-integration-card" className="rounded-2xl border border-border/50 bg-card">
+          <div className="p-5 border-b border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#3B82F6">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">PETE CRM</h2>
+                  <p className="text-sm text-muted-foreground">Real estate lead tracking (via Browserless)</p>
+                </div>
+              </div>
+              {isPeteConnected ? (
+                <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
+                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
+                  <XCircle className="mr-1 h-3 w-3" />
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="rounded-xl bg-muted/40 p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Company</p>
+                  <p className="text-base font-semibold">{selectedCompany.name}</p>
+                </div>
+                {isPeteConnected && peteIntegration?.last_sync_at && (
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Last Sync</p>
+                    <p className="text-sm font-medium">
+                      {new Date(peteIntegration.last_sync_at).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {isPeteConnected ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-full"
+                  onClick={handleSyncPete}
+                  disabled={syncingPete}
+                >
+                  {syncingPete ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center">
+                PETE CRM integration requires session cookies. Contact admin to configure.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Other Integrations Card - Labortech only now */}
       <div className="rounded-2xl border border-border/50 bg-card">
         <div className="p-5 border-b border-border/50">
           <h2 className="text-base font-semibold">Other Integrations</h2>
@@ -552,22 +693,14 @@ function SettingsContent() {
         </div>
         <div className="p-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { name: 'PETE CRM', description: 'Real estate lead tracking', company: 'Property Halo' },
-              { name: 'Labortech', description: 'Lead management', company: 'Unique Painting, ATI Security' },
-            ].map((integration) => (
-              <div
-                key={integration.name}
-                className="rounded-xl border border-border/50 bg-muted/20 p-4 opacity-70"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">{integration.name}</h3>
-                  <Badge variant="outline" className="text-xs rounded-full">Coming Soon</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">{integration.description}</p>
-                <p className="text-xs text-muted-foreground mt-1">For: {integration.company}</p>
+            <div className="rounded-xl border border-border/50 bg-muted/20 p-4 opacity-70">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">Labortech</h3>
+                <Badge variant="outline" className="text-xs rounded-full">Coming Soon</Badge>
               </div>
-            ))}
+              <p className="text-sm text-muted-foreground">Lead management</p>
+              <p className="text-xs text-muted-foreground mt-1">For: Unique Painting, ATI Security</p>
+            </div>
           </div>
         </div>
       </div>
