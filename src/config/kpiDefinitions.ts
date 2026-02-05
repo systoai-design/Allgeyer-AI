@@ -114,72 +114,70 @@ export const propertyHaloKpis: Record<CadenceType, KpiDefinition[]> = {
 };
 
 // Unique Painting KPIs
-// Data source: Jobber integration - now with date-filtered data
+// Data source: Jobber integration - tracks COUNTS only (not monetary values)
+// Financial metrics (revenue, profit) come from QuickBooks via Financial Control bot
 export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
   daily: [
-    { key: 'new_leads', label: 'New Leads', icon: Users, format: 'number', trendLabel: 'in period' },
-    { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'in period' },
-    { key: 'converted_quotes', label: 'Converted Quotes', icon: FileCheck, format: 'number', trendLabel: 'in period' },
-    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'in period' },
-    { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'in period' },
-    { key: 'invoiced_value', label: 'Invoiced Value', icon: DollarSign, format: 'currency', trendLabel: 'in period' },
-    { key: 'total_receivables', label: 'Total Receivables', icon: CreditCard, format: 'currency', trendLabel: 'outstanding' },
-    { key: 'avg_job_value', label: 'Avg Job Value', icon: Target, format: 'currency', trendLabel: 'in period' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'today' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'today' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'today' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'today' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'today' },
   ],
   weekly: [
-    { key: 'new_leads', label: 'New Leads', icon: Users, format: 'number', trendLabel: 'this week' },
-    { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
-    { key: 'converted_quotes', label: 'Converted Quotes', icon: FileCheck, format: 'number', trendLabel: 'this week' },
-    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this week' },
-    { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
-    { key: 'invoiced_value', label: 'Invoiced Value', icon: DollarSign, format: 'currency', trendLabel: 'this week' },
-    { key: 'total_receivables', label: 'Total Receivables', icon: CreditCard, format: 'currency', trendLabel: 'outstanding' },
-    { key: 'avg_job_value', label: 'Avg Job Value', icon: Target, format: 'currency', trendLabel: 'this week' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this week' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this week' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this week' },
   ],
   monthly: [
-    { key: 'new_leads', label: 'New Leads', icon: Users, format: 'number', trendLabel: 'this month' },
-    { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
-    { key: 'converted_quotes', label: 'Converted Quotes', icon: FileCheck, format: 'number', trendLabel: 'this month' },
-    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this month' },
-    { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
-    { key: 'invoiced_value', label: 'Invoiced Value', icon: DollarSign, format: 'currency', trendLabel: 'this month' },
-    { key: 'total_receivables', label: 'Total Receivables', icon: CreditCard, format: 'currency', trendLabel: 'outstanding' },
-    { key: 'avg_job_value', label: 'Avg Job Value', icon: Target, format: 'currency', trendLabel: 'this month' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this month' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this month' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this month' },
   ],
   quarterly: [
-    { key: 'new_leads', label: 'New Leads', icon: Users, format: 'number', trendLabel: 'this quarter' },
-    { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
-    { key: 'converted_quotes', label: 'Converted Quotes', icon: FileCheck, format: 'number', trendLabel: 'this quarter' },
-    { key: 'quote_value', label: 'Quote Value', icon: TrendingUp, format: 'currency', trendLabel: 'this quarter' },
-    { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
-    { key: 'invoiced_value', label: 'Invoiced Value', icon: DollarSign, format: 'currency', trendLabel: 'this quarter' },
-    { key: 'total_receivables', label: 'Total Receivables', icon: CreditCard, format: 'currency', trendLabel: 'outstanding' },
-    { key: 'avg_job_value', label: 'Avg Job Value', icon: Target, format: 'currency', trendLabel: 'this quarter' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this quarter' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this quarter' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this quarter' },
   ],
 };
 
 // ATI Security KPIs
+// Data source: Jobber integration - tracks COUNTS only (not monetary values)
+// Financial metrics (revenue, profit) come from QuickBooks via Financial Control bot
 export const atiSecurityKpis: Record<CadenceType, KpiDefinition[]> = {
   daily: [
-    { key: 'leads', label: 'Leads', icon: Users, format: 'number', trendLabel: 'vs yesterday' },
-    { key: 'estimates', label: 'Estimates', icon: FileCheck, format: 'number', trendLabel: 'vs yesterday' },
-    { key: 'active_projects', label: 'Active Projects', icon: Briefcase, format: 'number', trendLabel: 'vs yesterday' },
-    { key: 'installations_completed', label: 'Installations Completed', icon: ShieldCheck, format: 'number', trendLabel: 'vs yesterday' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'today' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'today' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'today' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'today' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'today' },
   ],
   weekly: [
-    { key: 'contracts_signed', label: 'Contracts Signed', icon: FileCheck, format: 'number', trendLabel: 'vs last week' },
-    { key: 'pipeline_value', label: 'Pipeline Value', icon: DollarSign, format: 'currency', trendLabel: 'vs last week' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this week' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this week' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this week' },
   ],
   monthly: [
-    { key: 'revenue', label: 'Revenue', icon: DollarSign, format: 'currency', trendLabel: 'vs last month' },
-    { key: 'gross_margin', label: 'Gross Margin', icon: Percent, format: 'percent', trendLabel: 'vs last month' },
-    { key: 'recurring_revenue', label: 'Recurring Revenue', icon: TrendingUp, format: 'currency', trendLabel: 'vs last month' },
-    { key: 'project_revenue', label: 'Project Revenue', icon: Briefcase, format: 'currency', trendLabel: 'vs last month' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this month' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this month' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this month' },
   ],
   quarterly: [
-    { key: 'contract_backlog', label: 'Contract Backlog', icon: ClipboardList, format: 'currency', trendLabel: 'vs last quarter' },
-    { key: 'avg_deal_size', label: 'Avg Deal Size', icon: Target, format: 'currency', trendLabel: 'vs last quarter' },
-    { key: 'client_concentration', label: 'Client Concentration', icon: Users, format: 'percent', trendLabel: 'top 3 clients' },
+    { key: 'requests', label: 'Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, format: 'number', trendLabel: 'this quarter' },
+    { key: 'jobs', label: 'Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
+    { key: 'invoices', label: 'Invoices', icon: CreditCard, format: 'number', trendLabel: 'this quarter' },
+    { key: 'payments', label: 'Payments', icon: DollarSign, format: 'number', trendLabel: 'this quarter' },
   ],
 };
 
