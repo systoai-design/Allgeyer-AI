@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.run-pete-scraper]
 verify_jwt = false
+
+[functions.labortech-api]
+verify_jwt = false
+
+[functions.trigger-scheduled-bots]
+verify_jwt = false

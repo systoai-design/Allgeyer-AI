@@ -22,6 +22,8 @@ function SettingsContent() {
   const [connectingJobber, setConnectingJobber] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
   const [syncingPete, setSyncingPete] = useState(false);
+  const [syncingLabortech, setSyncingLabortech] = useState(false);
+  const [testingLabortech, setTestingLabortech] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -318,6 +320,9 @@ function SettingsContent() {
   const peteIntegration = integrations.find(i => i.integration_type === 'pete_crm');
   const isPeteConnected = peteIntegration?.is_connected;
 
+  const labortechIntegration = integrations.find(i => i.integration_type === 'labortech');
+  const isLabortechConnected = labortechIntegration?.is_connected;
+
   const handleSyncPete = async () => {
     if (!selectedCompany) {
       toast.error('Please select a company first');
@@ -375,6 +380,177 @@ function SettingsContent() {
       toast.error(`Failed to sync PETE CRM: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSyncingPete(false);
+    }
+  };
+
+  const handleTestLabortech = async () => {
+    if (!selectedCompany) {
+      toast.error('Please select a company first');
+      return;
+    }
+
+    setTestingLabortech(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/labortech-api`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            company_id: selectedCompany.id,
+            action: 'test_connection',
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Create or update the labortech integration record
+      const existingIntegration = integrations.find(i => i.integration_type === 'labortech');
+      
+      if (existingIntegration) {
+        await supabase
+          .from('integrations')
+          .update({ 
+            is_connected: true, 
+            last_sync_at: new Date().toISOString(),
+            config: {
+              ...(existingIntegration.config || {}),
+              token_type: result.token_type,
+              locations: result.locations,
+            }
+          })
+          .eq('id', existingIntegration.id);
+      } else {
+        await supabase
+          .from('integrations')
+          .insert({
+            company_id: selectedCompany.id,
+            integration_type: 'labortech',
+            is_connected: true,
+            last_sync_at: new Date().toISOString(),
+            config: {
+              token_type: result.token_type,
+              locations: result.locations,
+            }
+          });
+      }
+
+      // Refresh integrations
+      const { data: updatedIntegrations } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('company_id', selectedCompany.id);
+
+      if (updatedIntegrations) {
+        setIntegrations(updatedIntegrations as Integration[]);
+      }
+
+      const locationCount = result.locations?.length || 0;
+      toast.success(
+        `Labortech connected! Found ${locationCount} location${locationCount !== 1 ? 's' : ''}`
+      );
+    } catch (error) {
+      console.error('Error testing Labortech:', error);
+      toast.error(`Failed to connect Labortech: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setTestingLabortech(false);
+    }
+  };
+
+  const handleSyncLabortech = async () => {
+    if (!selectedCompany) {
+      toast.error('Please select a company first');
+      return;
+    }
+
+    setSyncingLabortech(true);
+    try {
+      // Get location_id from config
+      const config = labortechIntegration?.config as { location_id?: string; locations?: Array<{ id: string }> } | undefined;
+      const locationId = config?.location_id || config?.locations?.[0]?.id;
+
+      if (!locationId) {
+        toast.error('No location configured. Please set a location ID first.');
+        setSyncingLabortech(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/labortech-api`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            company_id: selectedCompany.id,
+            action: 'get_contacts',
+            location_id: locationId,
+            limit: 100,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Update the last_sync_at timestamp
+      await supabase
+        .from('integrations')
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq('company_id', selectedCompany.id)
+        .eq('integration_type', 'labortech');
+
+      // Refresh integrations
+      const { data: updatedIntegrations } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('company_id', selectedCompany.id);
+
+      if (updatedIntegrations) {
+        setIntegrations(updatedIntegrations as Integration[]);
+      }
+
+      const contactCount = result.total || result.contacts?.length || 0;
+      toast.success(
+        `Labortech sync successful! Found ${contactCount} contacts/leads`
+      );
+    } catch (error) {
+      console.error('Error syncing Labortech:', error);
+      toast.error(`Failed to sync Labortech: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSyncingLabortech(false);
+    }
+  };
+
+  const handleDisconnectLabortech = async () => {
+    if (!labortechIntegration) return;
+
+    try {
+      const { error } = await supabase
+        .from('integrations')
+        .update({ is_connected: false })
+        .eq('id', labortechIntegration.id);
+
+      if (error) throw error;
+
+      toast.success('Labortech disconnected');
+      setIntegrations(prev => 
+        prev.map(i => i.id === labortechIntegration.id ? { ...i, is_connected: false } : i)
+      );
+    } catch (error) {
+      console.error('Error disconnecting Labortech:', error);
+      toast.error('Failed to disconnect Labortech');
     }
   };
 
@@ -687,25 +863,112 @@ function SettingsContent() {
         </div>
       )}
 
-      {/* Other Integrations Card - Labortech only now */}
-      <div className="rounded-2xl border border-border/50 bg-card">
-        <div className="p-5 border-b border-border/50">
-          <h2 className="text-base font-semibold">Other Integrations</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Additional platform connections</p>
-        </div>
-        <div className="p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border/50 bg-muted/20 p-4 opacity-70">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium">Labortech</h3>
-                <Badge variant="outline" className="text-xs rounded-full">Coming Soon</Badge>
+      {/* Labortech Integration Card - Show only for Unique Painting and ATI Security */}
+      {(selectedCompany?.company_type === 'unique_painting' || selectedCompany?.company_type === 'ati_security') && (
+        <div id="labortech-integration-card" className="rounded-2xl border border-border/50 bg-card">
+          <div className="p-5 border-b border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/10">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="#F97316">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold">Labortech</h2>
+                  <p className="text-sm text-muted-foreground">Lead management (GoHighLevel)</p>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Lead management</p>
-              <p className="text-xs text-muted-foreground mt-1">For: Unique Painting, ATI Security</p>
+              {isLabortechConnected ? (
+                <Badge variant="default" className="bg-success/10 text-success border-success/20 rounded-full">
+                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-muted text-muted-foreground rounded-full">
+                  <XCircle className="mr-1 h-3 w-3" />
+                  Not Connected
+                </Badge>
+              )}
             </div>
           </div>
+          <div className="p-5">
+            {selectedCompany ? (
+              <>
+                <div className="rounded-xl bg-muted/40 p-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Company</p>
+                      <p className="text-base font-semibold">{selectedCompany.name}</p>
+                    </div>
+                    {isLabortechConnected && labortechIntegration?.last_sync_at && (
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Last Sync</p>
+                        <p className="text-sm font-medium">
+                          {new Date(labortechIntegration.last_sync_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isLabortechConnected ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 rounded-full"
+                      onClick={handleSyncLabortech}
+                      disabled={syncingLabortech}
+                    >
+                      {syncingLabortech ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Sync Now
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={handleDisconnectLabortech}
+                      disabled={syncingLabortech}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full rounded-full bg-orange-500 hover:bg-orange-600 text-white"
+                    onClick={handleTestLabortech}
+                    disabled={testingLabortech || loadingIntegrations}
+                  >
+                    {testingLabortech ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Connect to Labortech
+                      </>
+                    )}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                <p>Please select a company from the sidebar to manage integrations.</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Support Contact Card */}
       <div className="rounded-2xl border border-border/50 bg-card">
