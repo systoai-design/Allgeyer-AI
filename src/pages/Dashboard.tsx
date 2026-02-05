@@ -462,8 +462,14 @@ function DashboardContent() {
     : 'All time';
 
   // Get aggregated KPI values for the date range - use most recently created record
-  const getAggregatedKpiValue = (kpiLabel: string) => {
-    const matchingKpis = kpiHistory.filter(k => k.kpi_name === kpiLabel);
+  // Accepts either key (e.g., 'leads') or label (e.g., 'Leads') for backwards compatibility
+  const getAggregatedKpiValue = (kpiKeyOrLabel: string) => {
+    // Try matching by key (lowercase), then by label (as stored in some edge functions)
+    const normalizedKey = kpiKeyOrLabel.toLowerCase().replace(/\s+/g, '_');
+    const matchingKpis = kpiHistory.filter(k => {
+      const storedName = k.kpi_name.toLowerCase().replace(/\s+/g, '_');
+      return storedName === normalizedKey || k.kpi_name === kpiKeyOrLabel;
+    });
     if (matchingKpis.length === 0) return null;
     
     // Use created_at to get the truly most recent record (handles multiple records with same period_end)
