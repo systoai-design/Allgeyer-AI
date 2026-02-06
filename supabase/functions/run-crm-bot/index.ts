@@ -66,7 +66,7 @@ const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[
   },
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
