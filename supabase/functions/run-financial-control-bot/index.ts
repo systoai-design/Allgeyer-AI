@@ -31,7 +31,7 @@ interface BotRunSummary {
   exceptions_created: number;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
