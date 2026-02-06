@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
 const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
+const GHL_API_BASE = "https://services.leadconnectorhq.com";
 
 interface JobberTokens {
   access_token: string;
@@ -24,6 +25,10 @@ interface CRMBotRunSummary {
   period_start: string;
   period_end: string;
   source: string;
+  labortech_data?: {
+    open_opportunities: number;
+    pipeline_names: string[];
+  };
 }
 
 const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[] }> = {
@@ -49,6 +54,7 @@ const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[
       'Invoiced Value',
       'Total Receivables',
       'Avg Job Value',
+      'Open Opportunities',
     ],
   },
   ati_security: {
@@ -62,6 +68,7 @@ const CRM_CONFIGS: Record<string, { integration_type: string; kpi_names: string[
       'Invoiced Value',
       'Total Receivables',
       'Avg Job Value',
+      'Open Opportunities',
     ],
   },
 };
@@ -76,6 +83,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const jobberClientId = Deno.env.get('JOBBER_CLIENT_ID');
     const jobberClientSecret = Deno.env.get('JOBBER_CLIENT_SECRET');
+    const labortechApiKey = Deno.env.get('LABORTECH_API_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -248,6 +256,39 @@ Deno.serve(async (req) => {
       
       console.log('Jobber KPIs fetched:', kpis);
 
+      // Also fetch Labortech open opportunities if connected
+      let labortechData: { open_opportunities: number; pipeline_names: string[] } | undefined;
+      
+      if (labortechApiKey && (bot_type === 'unique_painting' || bot_type === 'ati_security')) {
+        // Check if Labortech is connected for this company
+        const { data: labortechIntegration } = await supabase
+          .from('integrations')
+          .select('*')
+          .eq('company_id', company_id)
+          .eq('integration_type', 'labortech')
+          .eq('is_connected', true)
+          .single();
+
+        if (labortechIntegration) {
+          const labortechConfig = labortechIntegration.config as Record<string, string>;
+          const locationId = labortechConfig?.location_id;
+
+          if (locationId) {
+            console.log(`Fetching Labortech open opportunities for location: ${locationId}`);
+            labortechData = await fetchLabortechOpportunities(labortechApiKey, locationId);
+            
+            if (labortechData) {
+              kpis['Open Opportunities'] = labortechData.open_opportunities;
+              console.log(`Labortech: ${labortechData.open_opportunities} open opportunities across ${labortechData.pipeline_names.length} pipelines`);
+            }
+          } else {
+            console.log('Labortech connected but no location_id configured');
+          }
+        } else {
+          console.log('Labortech not connected for this company, skipping');
+        }
+      }
+
       // Update last sync
       await supabase.from('integrations').update({
         last_sync_at: new Date().toISOString(),
@@ -257,11 +298,12 @@ Deno.serve(async (req) => {
         integration_status: 'connected',
         integration_type: 'jobber',
         bot_type,
-        message: 'Live data fetched from Jobber successfully.',
+        message: 'Live data fetched from Jobber successfully.' + (labortechData ? ` Labortech: ${labortechData.open_opportunities} open opportunities.` : ''),
         kpis,
         period_start: periodStart,
         period_end: periodEnd,
         source: 'jobber',
+        labortech_data: labortechData,
       };
 
       // Store KPIs in kpi_history
@@ -277,7 +319,7 @@ Deno.serve(async (req) => {
             kpi_value: value,
             kpi_status: 'on_track',
             metadata: {
-              source: 'jobber',
+              source: kpiName === 'Open Opportunities' ? 'labortech' : 'jobber',
               generated_at: new Date().toISOString(),
             },
           });
@@ -320,6 +362,69 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Fetch open opportunities from Labortech (GHL) - all pipelines, status open
+async function fetchLabortechOpportunities(apiKey: string, locationId: string): Promise<{ open_opportunities: number; pipeline_names: string[] }> {
+  const ghlHeaders = {
+    "Authorization": `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+    "Version": "2021-07-28",
+  };
+
+  try {
+    // First, get all pipelines for this location
+    const pipelinesResponse = await fetch(
+      `${GHL_API_BASE}/opportunities/pipelines?locationId=${locationId}`,
+      { headers: ghlHeaders }
+    );
+
+    if (!pipelinesResponse.ok) {
+      const errorText = await pipelinesResponse.text();
+      console.error('Failed to fetch pipelines:', pipelinesResponse.status, errorText);
+      return { open_opportunities: 0, pipeline_names: [] };
+    }
+
+    const pipelinesData = await pipelinesResponse.json();
+    const pipelines = pipelinesData.pipelines || [];
+    console.log(`Found ${pipelines.length} pipelines in Labortech`);
+
+    let totalOpenOpportunities = 0;
+    const pipelineNames: string[] = [];
+
+    // For each pipeline, search for open opportunities
+    for (const pipeline of pipelines) {
+      pipelineNames.push(pipeline.name || 'Unknown Pipeline');
+      
+      const searchResponse = await fetch(
+        `${GHL_API_BASE}/opportunities/search?location_id=${locationId}&pipeline_id=${pipeline.id}&status=open&limit=100`,
+        { 
+          method: "POST",
+          headers: ghlHeaders,
+          body: JSON.stringify({})
+        }
+      );
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        const opportunities = searchData.opportunities || [];
+        const count = searchData.meta?.total || opportunities.length;
+        totalOpenOpportunities += count;
+        console.log(`Pipeline "${pipeline.name}": ${count} open opportunities`);
+      } else {
+        const errorText = await searchResponse.text();
+        console.error(`Failed to search pipeline ${pipeline.name}:`, searchResponse.status, errorText);
+      }
+    }
+
+    return {
+      open_opportunities: totalOpenOpportunities,
+      pipeline_names: pipelineNames,
+    };
+  } catch (error) {
+    console.error('Error fetching Labortech opportunities:', error);
+    return { open_opportunities: 0, pipeline_names: [] };
+  }
+}
 
 async function fetchJobberKPIs(accessToken: string, periodStart: string, periodEnd: string, onTokenExpired?: () => Promise<string | null>): Promise<Record<string, number>> {
   const kpis: Record<string, number> = {};

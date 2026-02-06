@@ -24,6 +24,7 @@ interface BotRunSummary {
   total_income: number;
   total_expenses: number;
   net_cash_flow: number;
+  pnl_net_income: number | null; // From P&L report - accounting-based net profit
   bank_accounts: string[];
   period_start: string;
   period_end: string;
@@ -168,8 +169,12 @@ Deno.serve(async (req) => {
     const balances = await fetchQBOBalances(accessToken, realmId);
     console.log('Fetched account balances from QBO');
 
+    // Fetch Profit & Loss report for accurate Net Profit
+    const pnlData = await fetchQBOProfitAndLoss(accessToken, realmId, periodStart, periodEnd);
+    console.log('Fetched P&L report from QBO:', pnlData);
+
     // Process transactions and store them
-    const summary = await processTransactions(supabase, company_id, transactions, balances, periodStart, periodEnd);
+    const summary = await processTransactions(supabase, company_id, transactions, balances, periodStart, periodEnd, pnlData);
 
     // Get the Financial Control bot ID
     const { data: fcBot } = await supabase
@@ -332,13 +337,66 @@ async function fetchQBOBalances(accessToken: string, realmId: string): Promise<a
   return balanceData;
 }
 
+async function fetchQBOProfitAndLoss(accessToken: string, realmId: string, startDate: string, endDate: string): Promise<{ totalIncome: number; totalExpenses: number; netIncome: number } | null> {
+  try {
+    const pnlUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&minorversion=65`;
+    
+    const pnlResp = await fetch(pnlUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!pnlResp.ok) {
+      console.error('P&L report fetch failed:', pnlResp.status);
+      return null;
+    }
+
+    const pnlData = await pnlResp.json();
+    
+    // Parse QBO P&L report structure
+    // The report has Rows with groups: Income, Expenses, and Net Income
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    let netIncome = 0;
+
+    const rows = pnlData?.Rows?.Row || [];
+    for (const row of rows) {
+      if (row.group === 'Income' && row.Summary?.ColData) {
+        totalIncome = parseFloat(row.Summary.ColData[1]?.value || '0');
+      } else if (row.group === 'Expenses' && row.Summary?.ColData) {
+        totalExpenses = parseFloat(row.Summary.ColData[1]?.value || '0');
+      } else if (row.type === 'Section' && row.group === 'NetIncome' && row.Summary?.ColData) {
+        netIncome = parseFloat(row.Summary.ColData[1]?.value || '0');
+      }
+    }
+
+    // Also check for a top-level NetIncome row
+    if (netIncome === 0) {
+      const netIncomeRow = rows.find((r: any) => r.group === 'NetIncome' || (r.Summary?.ColData?.[0]?.value === 'Net Income'));
+      if (netIncomeRow?.Summary?.ColData) {
+        netIncome = parseFloat(netIncomeRow.Summary.ColData[1]?.value || '0');
+      }
+    }
+
+    console.log(`P&L Report: Income=$${totalIncome}, Expenses=$${totalExpenses}, Net Income=$${netIncome}`);
+    
+    return { totalIncome, totalExpenses, netIncome };
+  } catch (error) {
+    console.error('Error fetching P&L report:', error);
+    return null;
+  }
+}
+
 async function processTransactions(
   supabase: any,
   companyId: string,
   transactions: any[],
   balances: any,
   periodStart: string,
-  periodEnd: string
+  periodEnd: string,
+  pnlData: { totalIncome: number; totalExpenses: number; netIncome: number } | null
 ): Promise<BotRunSummary> {
   let uncategorizedCount = 0;
   let needsClarificationCount = 0;
@@ -401,6 +459,7 @@ async function processTransactions(
     total_income: totalIncome,
     total_expenses: totalExpenses,
     net_cash_flow: totalIncome - totalExpenses,
+    pnl_net_income: pnlData?.netIncome ?? null,
     bank_accounts: Array.from(bankAccountsSet),
     period_start: periodStart,
     period_end: periodEnd,
@@ -418,12 +477,20 @@ async function generateKPIs(
   periodStart: string,
   periodEnd: string
 ): Promise<void> {
-  // Calculate profit metrics
-  // Note: In a full implementation, COGS would come from specific QBO accounts
-  // For now, we estimate gross profit as income minus 60% (typical COGS for service businesses)
-  const estimatedCogs = summary.total_income * 0.4; // 40% COGS estimate
+  // Net Profit from P&L report (accounting-based, includes accruals, depreciation, etc.)
+  // Falls back to transaction-based calculation if P&L report unavailable
+  const netProfit = summary.pnl_net_income !== null ? summary.pnl_net_income : (summary.total_income - summary.total_expenses);
+  const netProfitSource = summary.pnl_net_income !== null ? 'pnl_report' : 'transaction_based';
+  
+  // Net Cash Flow from actual bank transactions (cash-based)
+  // This tracks real cash movement, which can differ from accounting profit
+  const netCashFlow = summary.net_cash_flow; // totalIncome - totalExpenses from transactions
+  
+  // Gross Profit: estimated with 40% COGS placeholder
+  const estimatedCogs = summary.total_income * 0.4;
   const grossProfit = summary.total_income - estimatedCogs;
-  const netProfit = summary.total_income - summary.total_expenses;
+  
+  console.log(`Net Profit (${netProfitSource}): $${netProfit}, Net Cash Flow (transactions): $${netCashFlow}`);
   
   const kpis = [
     // Universal KPIs (ALL companies)
@@ -442,11 +509,11 @@ async function generateKPIs(
       kpi_value: netProfit,
       kpi_status: netProfit >= 0 ? 'on_track' : netProfit > -10000 ? 'warning' : 'critical',
     },
-    // Existing operational KPIs
+    // Net Cash Flow - from actual cash transactions (distinct from accounting profit)
     {
       kpi_name: 'Net Cash Flow',
-      kpi_value: summary.net_cash_flow,
-      kpi_status: summary.net_cash_flow >= 0 ? 'on_track' : 'warning',
+      kpi_value: netCashFlow,
+      kpi_status: netCashFlow >= 0 ? 'on_track' : 'warning',
     },
     {
       kpi_name: 'Categorization Rate',
