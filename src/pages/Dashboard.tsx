@@ -608,7 +608,7 @@ function DashboardContent() {
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {selectedCompany?.company_type === 'property_halo' ? 'Asset Summary & CRM data from PETE' : 
-                   selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Labortech' : 
+                   selectedCompany?.company_type === 'unique_painting' ? 'Job tracking from Jobber' : 
                    'Project tracking from Jobber'}
                 </p>
               </div>
