@@ -124,6 +124,7 @@ export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'today' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'today' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'today' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'today' },
   ],
   weekly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
@@ -132,6 +133,7 @@ export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this week' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this week' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this week' },
   ],
   monthly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
@@ -140,6 +142,7 @@ export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this month' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this month' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this month' },
   ],
   quarterly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
@@ -148,6 +151,7 @@ export const uniquePaintingKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this quarter' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this quarter' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this quarter' },
   ],
 };
 
@@ -162,6 +166,7 @@ export const atiSecurityKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'today' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'today' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'today' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'today' },
   ],
   weekly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this week' },
@@ -170,6 +175,7 @@ export const atiSecurityKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this week' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this week' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this week' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this week' },
   ],
   monthly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this month' },
@@ -178,6 +184,7 @@ export const atiSecurityKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this month' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this month' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this month' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this month' },
   ],
   quarterly: [
     { key: 'new_requests', label: 'New Requests', icon: ClipboardList, format: 'number', trendLabel: 'this quarter' },
@@ -186,6 +193,7 @@ export const atiSecurityKpis: Record<CadenceType, KpiDefinition[]> = {
     { key: 'new_jobs', label: 'New Jobs', icon: Hammer, format: 'number', trendLabel: 'this quarter' },
     { key: 'invoiced_value', label: 'Invoiced Value', icon: CreditCard, format: 'currency', trendLabel: 'this quarter' },
     { key: 'total_receivables', label: 'Total Receivables', icon: DollarSign, format: 'currency', trendLabel: 'this quarter' },
+    { key: 'open_opportunities', label: 'Open Opportunities', icon: Target, format: 'number', trendLabel: 'this quarter' },
   ],
 };
 
