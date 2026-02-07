@@ -279,7 +279,9 @@ Deno.serve(async (req) => {
             
             if (labortechData) {
               kpis['Open Opportunities'] = labortechData.open_opportunities;
-              console.log(`Labortech: ${labortechData.open_opportunities} open opportunities across ${labortechData.pipeline_names.length} pipelines`);
+              // For Unique Painting & ATI Security, New Requests = Labortech open opportunities
+              kpis['New Requests'] = labortechData.open_opportunities;
+              console.log(`Labortech: ${labortechData.open_opportunities} open opportunities (mapped to New Requests) across ${labortechData.pipeline_names.length} pipelines`);
             }
           } else {
             console.log('Labortech connected but no location_id configured');
@@ -319,7 +321,7 @@ Deno.serve(async (req) => {
             kpi_value: value,
             kpi_status: 'on_track',
             metadata: {
-              source: kpiName === 'Open Opportunities' ? 'labortech' : 'jobber',
+              source: (kpiName === 'Open Opportunities' || kpiName === 'New Requests') ? 'labortech' : 'jobber',
               generated_at: new Date().toISOString(),
             },
           });
