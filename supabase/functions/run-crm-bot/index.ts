@@ -397,29 +397,61 @@ async function fetchLabortechOpportunities(apiKey: string, locationId: string, p
     for (const pipeline of pipelines) {
       pipelineNames.push(pipeline.name || 'Unknown Pipeline');
       
-      const searchParams = new URLSearchParams({
-        location_id: locationId,
-        pipeline_id: pipeline.id,
-        status: "open",
-        limit: "100",
-      });
-      // Note: Open opportunities is a point-in-time snapshot metric, not date-filtered
-      // It shows current pipeline volume regardless of when opportunities were created
-      const searchResponse = await fetch(
-        `${GHL_API_BASE}/opportunities/search?${searchParams.toString()}`,
-        { headers: ghlHeaders }
-      );
+      // Fetch open opportunities - use larger limit to minimize pagination
+      let allOpportunities: any[] = [];
+      let startAfter = 0;
+      let hasMore = true;
 
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        const opportunities = searchData.opportunities || [];
-        const count = searchData.meta?.total || opportunities.length;
-        totalOpenOpportunities += count;
-        console.log(`Pipeline "${pipeline.name}": ${count} open opportunities`);
-      } else {
-        const errorText = await searchResponse.text();
-        console.error(`Failed to search pipeline ${pipeline.name}:`, searchResponse.status, errorText);
+      while (hasMore) {
+        const searchParams = new URLSearchParams({
+          location_id: locationId,
+          pipeline_id: pipeline.id,
+          status: "open",
+          limit: "100",
+        });
+        if (startAfter > 0) {
+          searchParams.set("startAfter", String(startAfter));
+        }
+
+        const searchResponse = await fetch(
+          `${GHL_API_BASE}/opportunities/search?${searchParams.toString()}`,
+          { headers: ghlHeaders }
+        );
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const opportunities = searchData.opportunities || [];
+          allOpportunities = allOpportunities.concat(opportunities);
+          
+          const total = searchData.meta?.total || 0;
+          if (allOpportunities.length >= total || opportunities.length < 100) {
+            hasMore = false;
+          } else {
+            startAfter = allOpportunities.length;
+          }
+        } else {
+          const errorText = await searchResponse.text();
+          console.error(`Failed to search pipeline ${pipeline.name}:`, searchResponse.status, errorText);
+          hasMore = false;
+        }
       }
+
+      // Filter by creation date if date range provided
+      let count = allOpportunities.length;
+      if (periodStart && periodEnd) {
+        const startDate = new Date(`${periodStart}T00:00:00Z`);
+        const endDate = new Date(`${periodEnd}T23:59:59Z`);
+        const filtered = allOpportunities.filter((opp: any) => {
+          const created = new Date(opp.createdAt || opp.dateAdded || opp.created_at || '');
+          return !isNaN(created.getTime()) && created >= startDate && created <= endDate;
+        });
+        console.log(`Pipeline "${pipeline.name}": ${allOpportunities.length} total open, ${filtered.length} created in ${periodStart} to ${periodEnd}`);
+        count = filtered.length;
+      } else {
+        console.log(`Pipeline "${pipeline.name}": ${count} open opportunities (no date filter)`);
+      }
+
+      totalOpenOpportunities += count;
     }
 
     return {
