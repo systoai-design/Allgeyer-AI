@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
 
           if (locationId) {
             console.log(`Fetching Labortech open opportunities for location: ${locationId}`);
-            labortechData = await fetchLabortechOpportunities(labortechApiKey, locationId);
+            labortechData = await fetchLabortechOpportunities(labortechApiKey, locationId, periodStart, periodEnd);
             
             if (labortechData) {
               kpis['Open Opportunities'] = labortechData.open_opportunities;
@@ -365,8 +365,8 @@ Deno.serve(async (req) => {
   }
 });
 
-// Fetch open opportunities from Labortech (GHL) - all pipelines, status open
-async function fetchLabortechOpportunities(apiKey: string, locationId: string): Promise<{ open_opportunities: number; pipeline_names: string[] }> {
+// Fetch open opportunities from Labortech (GHL) - all pipelines, status open, filtered by date range
+async function fetchLabortechOpportunities(apiKey: string, locationId: string, periodStart?: string, periodEnd?: string): Promise<{ open_opportunities: number; pipeline_names: string[] }> {
   const ghlHeaders = {
     "Authorization": `Bearer ${apiKey}`,
     "Content-Type": "application/json",
@@ -403,6 +403,8 @@ async function fetchLabortechOpportunities(apiKey: string, locationId: string): 
         status: "open",
         limit: "100",
       });
+      // Note: Open opportunities is a point-in-time snapshot metric, not date-filtered
+      // It shows current pipeline volume regardless of when opportunities were created
       const searchResponse = await fetch(
         `${GHL_API_BASE}/opportunities/search?${searchParams.toString()}`,
         { headers: ghlHeaders }
