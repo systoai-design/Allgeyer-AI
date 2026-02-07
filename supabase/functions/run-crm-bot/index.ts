@@ -397,18 +397,15 @@ async function fetchLabortechOpportunities(apiKey: string, locationId: string): 
     for (const pipeline of pipelines) {
       pipelineNames.push(pipeline.name || 'Unknown Pipeline');
       
+      const searchParams = new URLSearchParams({
+        location_id: locationId,
+        pipeline_id: pipeline.id,
+        status: "open",
+        limit: "100",
+      });
       const searchResponse = await fetch(
-        `${GHL_API_BASE}/opportunities/search`,
-        { 
-          method: "POST",
-          headers: ghlHeaders,
-          body: JSON.stringify({
-            locationId: locationId,
-            pipeline_id: pipeline.id,
-            status: "open",
-            limit: 100
-          })
-        }
+        `${GHL_API_BASE}/opportunities/search?${searchParams.toString()}`,
+        { headers: ghlHeaders }
       );
 
       if (searchResponse.ok) {
