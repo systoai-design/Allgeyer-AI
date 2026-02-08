@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.trigger-scheduled-bots]
 verify_jwt = false
+
+[functions.slack-bot]
+verify_jwt = false
